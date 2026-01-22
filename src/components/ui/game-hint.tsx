@@ -43,13 +43,13 @@ export default function GameHint({ hints, isVisible }: GameHintProps) {
 
               <div className="flex-1">
                 <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400/80">
-                  System Hint // Tutorial
+                  SYSTEM_AGENT
                 </h4>
                 <motion.p 
                   key={currentHint}
                   initial={{ opacity: 0, x: 10 }}
                   animate={{ opacity: 1, x: 0 }}
-                  className="mt-1 text-xs leading-relaxed text-white/70"
+                  className="mt-1 text-[13px] font-medium leading-relaxed text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]"
                 >
                   {hints[currentHint]}
                 </motion.p>
