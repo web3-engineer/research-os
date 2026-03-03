@@ -1,9 +1,9 @@
 {
     "navbar": {
-        "about": "Sobre nós",
-        "homework": "Laboratório de Pesquisa",
-        "workstation": "Estação de trabalho",
-        "study_rooms": "Salas de estudo"
+        "about": "SOBRE NÓS",
+        "homework": "PESQUISA",
+        "workstation": "ESTAÇÃO DE TRABALHO",
+        "study_rooms": "SALAS DE ESTUDO"
     },
     "intro": {
         "line1": "ESTUDE, APRENDA = PESQUISE...",
@@ -142,10 +142,7 @@
         }
     },
     "encryption": {
-        "title": "Agentes de IA de outra dimensão.",
-        "subtitle": "Eles vieram para ajudá-lo a ser o melhor.",
-        "button": "Saber mais",
-        "typing_title": "Uma nova forma de produzir ciência.",
+        "typing_title": "UM NOVO JEITO DE SER MELHOR.",
         "pipeline_title": "O gasoduto Zaeon",
         "steps": {
             "vertex": {
@@ -194,12 +191,12 @@
         "system": "SISTEMA_OPTIMAL",
         "secure": "SECURE_CHANNEL",
         "encrypted": "CRIPTOGRAFADO",
-        "highlight": "Encontre seu esquadrão. Pesquisar. Publicar.",
-        "together": "JUNTO.",
+        "highlight": "ENCONTRE SEU GRUPO. PESQUISEM. PUBLIQUEM.",
+        "together": "JUNTOS.",
         "lobby_status": "LOBBY_STATUS: AO VIVO",
-        "find_party": "Ciência Coletiva é mais engraçada",
+        "find_party": "Aprender em grupo é mais divertido 😎",
         "select_cluster": "Selecione um cluster de pesquisa",
-        "join": "Entrar na sessão",
+        "join": "ENTRAR NA SESSÃO",
         "select": "Selecione um quarto",
         "rooms": {
             "cyber_name": "Salão Cibernético",
@@ -209,7 +206,9 @@
             "quantum_name": "Campo Quântico",
             "quantum_topic": "Matemática e física",
             "global_name": "Salão Global",
-            "global_topic": "Estudos Gerais"
+            "global_topic": "Estudos Gerais",
+            "humanities_name": "Humanidades",
+            "humanities_topic": "História, Sociologia e Antropologia"
         }
     },
     "lounge_chat": {

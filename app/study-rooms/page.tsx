@@ -12,6 +12,7 @@ import {
     CalculatorIcon,
     GlobeAltIcon,
     WifiIcon,
+    BookOpenIcon,
 } from "@heroicons/react/24/outline";
 import MatrixRain from "@/components/main/star-background";
 
@@ -26,49 +27,58 @@ export default function StudyRoomsPage() {
     }, []);
 
     const ROOMS = [
-        {
+         {
             id: 1,
+            nameKey: "global_name",
+            topicKey: "global_topic",
+            users: 310,
+            ping: "ONLINE",
+            icon: GlobeAltIcon,
+            color: "text-blue-300",
+            bg: "bg-blue-500/20",
+            route: "/study-rooms/lounge"
+        },
+        {
+            id: 2,
             nameKey: "cyber_name",
             topicKey: "cyber_topic",
             users: 142,
-            ping: "12ms",
+            ping: "ONLINE",
             icon: CpuChipIcon,
             color: "text-cyan-300",
             bg: "bg-cyan-500/20",
             route: "/study-rooms/cyber"
         },
         {
-            id: 2,
+            id: 3,
             nameKey: "bio_name",
             topicKey: "bio_topic",
             users: 89,
-            ping: "24ms",
+            ping: "ONLINE",
             icon: BeakerIcon,
             color: "text-green-300",
             bg: "bg-green-500/20",
             route: "/study-rooms/bio"
         },
         {
-            id: 3,
+            id: 4,
             nameKey: "quantum_name",
             topicKey: "quantum_topic",
             users: 56,
-            ping: "18ms",
+            ping: "OFFLINE",
             icon: CalculatorIcon,
             color: "text-purple-300",
             bg: "bg-purple-500/20",
             route: "/study-rooms/quantic"
         },
-        {
-            id: 4,
-            nameKey: "global_name",
-            topicKey: "global_topic",
-            users: 310,
-            ping: "45ms",
-            icon: GlobeAltIcon,
-            color: "text-blue-300",
-            bg: "bg-blue-500/20",
-            route: "/study-rooms/lounge"
+       {
+            id: 5,
+            nameKey: "humanities_name",
+            topicKey: "humanities_topic",
+            icon: BookOpenIcon,
+            color: "text-purple-300",
+            bg: "bg-purple-500/20",
+            route: "/study-rooms/humanities"
         },
     ];
 
@@ -166,7 +176,7 @@ export default function StudyRoomsPage() {
                         <div className="absolute bottom-0 left-[5%] w-[90%] h-[60%] blur-[100px] rounded-full bg-slate-400/30 dark:bg-blue-900/15" />
                         <Image
                             src="/study-char.png"
-                            alt="Study Character"
+                            alt="Zaeon Brain"
                             fill
                             className="object-contain object-bottom drop-shadow-[0_10px_30px_rgba(0,0,0,0.3)] dark:drop-shadow-[0_0_60px_rgba(0,0,0,0.9)] scale-100 origin-bottom"
                             priority

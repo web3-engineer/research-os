@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { useTheme } from "next-themes"; // Importado para suporte nativo claro/escuro
+import { useTheme } from "next-themes";
 import { 
     ChevronLeftIcon, 
     ChevronRightIcon, 
@@ -116,27 +116,41 @@ const SectionSeparator = () => (
     </div>
 );
 
-// --- COMPONENTE: FUNDO INTERDIMENSIONAL ---
+// --- COMPONENTE: FUNDO INTERDIMENSIONAL (ATUALIZADO COM 3 IMAGENS E FLUTUAÇÃO) ---
 const BackgroundInterdimensional = () => {
     const [imgIndex, setImgIndex] = useState(0);
-    const [isDisturbing, setIsDisturbing] = useState(false);
+
+    const IMAGES = [
+        { src: "/about/angel1.png", isVertical: false },
+        { src: "/about/angel2.png", isVertical: true },
+        { src: "/about/angel3.png", isVertical: false } // A 3ª imagem tem a mesma lógica da 1ª
+    ];
 
     useEffect(() => {
+        // Lógica de tempo ajustada: 
+        // Angel 1 e 3 ficam por 7s. Angel 2 fica por 5s.
+        let intervalTime = imgIndex === 1 ? 8000 : 5000;
+        
         const interval = setInterval(() => {
-            setIsDisturbing(true);
-            setTimeout(() => setImgIndex((prev) => (prev === 0 ? 1 : 0)), 150); 
-            setTimeout(() => setIsDisturbing(false), 450); 
-        }, 7000); 
-        return () => clearInterval(interval);
-    }, []);
+            setImgIndex((prev) => (prev + 1) % IMAGES.length);
+        }, intervalTime);
 
-    const disturbVariants = {
-        hidden: { opacity: 1, filter: "brightness(1) blur(0px)", scale: 1 },
-        disturbed: { 
-            opacity: [1, 1, 1],
-            filter: ["brightness(1) blur(0px)", "brightness(2) blur(12px)", "brightness(1) blur(0px)"],
-            scale: [1, 1.04, 1],
-            transition: { duration: 0.4, ease: "easeInOut" }
+        return () => clearInterval(interval);
+    }, [imgIndex]); // O efeito roda novamente sempre que o index muda para pegar o novo timer
+
+    const transitionVariants = {
+        enter: { opacity: 0, filter: "brightness(2) blur(10px)", scale: 1.05 },
+        center: { 
+            opacity: 1, 
+            filter: "brightness(1) blur(0px)", 
+            scale: 1,
+            transition: { duration: 1.2, ease: "easeOut" }
+        },
+        exit: { 
+            opacity: 0, 
+            filter: "brightness(0.5) blur(5px)", 
+            scale: 0.95,
+            transition: { duration: 0.8, ease: "easeIn" }
         }
     };
 
@@ -145,20 +159,37 @@ const BackgroundInterdimensional = () => {
             <AnimatePresence mode="wait">
                 <motion.div 
                     key={imgIndex}
-                    initial={{ opacity: 0 }}
-                    animate={isDisturbing ? "disturbed" : "hidden"}
-                    exit={{ opacity: 0 }}
-                    variants={disturbVariants}
-                    transition={{ duration: 2 }}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    variants={transitionVariants}
                     className="absolute inset-0 flex items-center justify-center"
                 >
-                    {imgIndex === 0 ? (
+                    {!IMAGES[imgIndex].isVertical ? (
+                        // LÓGICA PARA ANGEL 1 E ANGEL 3 (Horizontais, mesma posição)
                         <div className="relative w-full h-full p-10 md:p-20"> 
-                            <Image src="/about/zaeon-angel1.png" alt="L1" fill className="object-contain" priority />
+                            <Image src={IMAGES[imgIndex].src} alt={`Angel ${imgIndex + 1}`} fill className="object-contain" priority />
                         </div>
                     ) : (
-                        <div className="relative w-full h-full z-10 flex items-center justify-end pr-5 md:pr-24">
-                            <Image src="/about/zaeon-angel2.png" alt="L2" width={1024} height={1536} className="w-auto h-[85%] object-contain drop-shadow-[0_0_50px_rgba(0,0,0,0.2)] dark:drop-shadow-[0_0_50px_rgba(0,0,0,0.9)]" />
+                        // LÓGICA PARA ANGEL 2 (Vertical, posicionada à direita, COM FLUTUAÇÃO)
+                        <div className="relative w-full h-full z-10 flex items-center justify-end pr-10 md:pr-24">
+                            <motion.div
+                                animate={{ y: ["-15px", "15px", "-15px"] }}
+                                transition={{ 
+                                    duration: 4, // Tempo de um ciclo completo de subida e descida
+                                    repeat: Infinity, 
+                                    ease: "easeInOut" 
+                                }}
+                                className="relative w-auto h-[85%]"
+                            >
+                                <Image 
+                                    src={IMAGES[imgIndex].src} 
+                                    alt="Angel 2 Floating" 
+                                    width={1024} 
+                                    height={1536} 
+                                    className="w-auto h-full object-contain drop-shadow-[0_0_50px_rgba(0,0,0,0.2)] dark:drop-shadow-[0_0_50px_rgba(0,0,0,0.9)]" 
+                                />
+                            </motion.div>
                         </div>
                     )}
                 </motion.div>
@@ -171,7 +202,6 @@ const BackgroundInterdimensional = () => {
 // --- COMPONENTE DIMENSIONAL CODEX ---
 const DimensionalCodex = ({ pages }: { pages: typeof MANIFESTO_PAGES }) => {
     const [page, setPage] = useState(0);
-    // Usamos o next-themes aqui se quiser sincronizar, mas vou manter o toggle local para o próprio Codex ser interativo
     const [isCodexDark, setIsCodexDark] = useState(true);
     const [direction, setDirection] = useState(0);
 
@@ -185,7 +215,7 @@ const DimensionalCodex = ({ pages }: { pages: typeof MANIFESTO_PAGES }) => {
     const iconColorDisabled = isCodexDark ? "text-gray-700" : "text-gray-300";
 
     return (
-        <div className="relative group perspective-2000 w-full flex justify-start lg:pl-10 z-30">
+        <div className="relative group perspective-2000 w-full flex justify-start z-30">
             <motion.div 
                 initial={{ opacity: 0, rotateY: -15 }}
                 animate={{ opacity: 1, rotateY: 0 }}
@@ -285,11 +315,11 @@ const DimensionalCodex = ({ pages }: { pages: typeof MANIFESTO_PAGES }) => {
     );
 };
 
-// --- AGENT SECTION ---
+// --- AGENT SECTION: REFORMULADA COM COLUNAS ESTÉTICAS ---
 const AgentSection = () => {
     return (
-        <section className="relative h-screen w-full flex flex-col items-center justify-center p-6 md:p-12 overflow-hidden z-10 transition-colors duration-500">
-            <div className="relative z-10 w-full max-w-4xl flex flex-col gap-8 items-center text-center">
+        <section className="relative min-h-screen w-full flex flex-col items-center justify-center p-6 md:p-12 overflow-hidden z-10 transition-colors duration-500">
+            <div className="relative z-10 w-full max-w-6xl flex flex-col gap-12 items-center text-center">
                 <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
@@ -304,18 +334,59 @@ const AgentSection = () => {
                     </p>
                 </motion.div>
 
-                <motion.div 
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    whileInView={{ opacity: 1, scale: 1 }}
-                    viewport={{ once: true }}
-                    whileHover={{ boxShadow: "0 0 40px rgba(34, 211, 238, 0.15)" }}
-                    className="w-full min-h-[400px] rounded-[2.5rem] bg-white/60 dark:bg-black/40 backdrop-blur-2xl border border-blue-200/50 dark:border-cyan-500/30 p-8 shadow-[0_20px_50px_rgba(0,0,0,0.05)] dark:shadow-[0_0_30px_rgba(0,0,0,0.6)] flex items-center justify-center transition-all duration-500"
-                >
-                    <div className="border border-dashed border-blue-300 dark:border-cyan-500/30 rounded-2xl w-full h-full min-h-[300px] flex flex-col items-center justify-center text-blue-400 dark:text-cyan-500/50">
-                         <CpuChipIcon className="w-12 h-12 mb-4 opacity-50" />
-                         <span className="text-xs font-mono uppercase tracking-widest">Image Placement Zone</span>
-                    </div>
-                </motion.div>
+                {/* CONTAINER DO CARD CENTRAL E COLUNAS LATERAIS */}
+                <div className="w-full flex items-center justify-center gap-4 md:gap-8">
+                    
+                    {/* COLUNA ESQUERDA (ESTÉTICA) */}
+                    <motion.div 
+                        initial={{ opacity: 0, x: -30 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.6, delay: 0.2 }}
+                        className="hidden lg:flex w-16 h-[500px] rounded-full bg-white/60 dark:bg-black/40 backdrop-blur-2xl border border-blue-200/50 dark:border-cyan-500/30 shadow-[0_20px_50px_rgba(0,0,0,0.05)] dark:shadow-xl flex-col items-center justify-between py-8 transition-all duration-500"
+                    >
+                        <div className="w-1.5 h-20 rounded-full bg-cyan-400/50 dark:bg-cyan-500/50" />
+                        <div className="flex flex-col gap-4">
+                            {[...Array(3)].map((_, i) => (
+                                <div key={`l-${i}`} className="w-2 h-2 rounded-full bg-cyan-500/80 dark:bg-cyan-400/80 animate-pulse shadow-[0_0_8px_#22d3ee]" style={{ animationDelay: `${i * 0.2}s` }} />
+                            ))}
+                        </div>
+                        <div className="w-1.5 h-20 rounded-full bg-cyan-400/50 dark:bg-cyan-500/50" />
+                    </motion.div>
+
+                    {/* CARD CENTRAL (FOCO) */}
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        whileInView={{ opacity: 1, scale: 1 }}
+                        viewport={{ once: true }}
+                        whileHover={{ boxShadow: "0 0 40px rgba(34, 211, 238, 0.15)" }}
+                        className="flex-1 w-full max-w-4xl min-h-[400px] rounded-[2.5rem] bg-white/60 dark:bg-black/40 backdrop-blur-2xl border border-blue-200/50 dark:border-cyan-500/30 p-8 shadow-[0_20px_50px_rgba(0,0,0,0.05)] dark:shadow-[0_0_30px_rgba(0,0,0,0.6)] flex items-center justify-center transition-all duration-500"
+                    >
+                        <div className="border border-dashed border-blue-300 dark:border-cyan-500/30 rounded-2xl w-full h-full min-h-[300px] flex flex-col items-center justify-center text-blue-400 dark:text-cyan-500/50">
+                             {/* ESPAÇO RESERVADO PARA IMAGENS / CONTEÚDO */}
+                             <CpuChipIcon className="w-12 h-12 mb-4 opacity-50" />
+                             <span className="text-xs font-mono uppercase tracking-widest">Image Placement Zone</span>
+                        </div>
+                    </motion.div>
+
+                    {/* COLUNA DIREITA (ESTÉTICA) */}
+                    <motion.div 
+                        initial={{ opacity: 0, x: 30 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.6, delay: 0.3 }}
+                        className="hidden lg:flex w-16 h-[500px] rounded-full bg-white/60 dark:bg-black/40 backdrop-blur-2xl border border-blue-200/50 dark:border-cyan-500/30 shadow-[0_20px_50px_rgba(0,0,0,0.05)] dark:shadow-xl flex-col items-center justify-between py-8 transition-all duration-500"
+                    >
+                        <div className="w-1.5 h-20 rounded-full bg-cyan-400/50 dark:bg-cyan-500/50" />
+                        <div className="flex flex-col gap-4">
+                            {[...Array(3)].map((_, i) => (
+                                <div key={`r-${i}`} className="w-2 h-2 rounded-full bg-cyan-500/80 dark:bg-cyan-400/80 animate-pulse shadow-[0_0_8px_#22d3ee]" style={{ animationDelay: `${i * 0.2 + 0.5}s` }} />
+                            ))}
+                        </div>
+                        <div className="w-1.5 h-20 rounded-full bg-cyan-400/50 dark:bg-cyan-500/50" />
+                    </motion.div>
+
+                </div>
             </div>
         </section>
     );
@@ -378,7 +449,7 @@ export default function TechnicalAboutPage() {
             <BackButton />
 
             {/* SEÇÃO 1: MANIFESTO & CODEX */}
-            <div className="relative min-h-screen w-full overflow-hidden flex flex-col justify-center z-20 p-6 md:p-12 lg:p-24 transition-colors duration-500">
+            <div className="relative min-h-screen w-full overflow-hidden flex flex-col justify-center z-20 p-6 md:p-12 lg:py-24 lg:pr-24 lg:pl-6 xl:pl-10 transition-colors duration-500">
                 <BackgroundInterdimensional />
                 <div className="relative z-30 w-full flex items-center justify-start">
                     <DimensionalCodex pages={MANIFESTO_PAGES} />

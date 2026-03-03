@@ -206,7 +206,9 @@
       "quantum_name": "Quantum Field",
       "quantum_topic": "Mathematics and physics",
       "global_name": "Global Lounge",
-      "global_topic": "General Studies"
+      "global_topic": "General Studies",
+      "humanities_name": "Humanities",
+      "humanities_topic": "History, Sociology, Anthropology"
     }
   },
   "lounge_chat": {
