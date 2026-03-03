@@ -5,17 +5,18 @@ import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import {
-    Terminal, Lock, CheckCircle2, XCircle,
+    Terminal, Lock, XCircle,
     BookOpen, ClipboardList, Cpu, Activity,
-    Users, Eye, EyeOff
+    Users, Eye, EyeOff, UserCircle, Newspaper
 } from 'lucide-react';
 import { Navbar } from "@/components/main/navbar";
 import { LoungeChatWidget } from "@/components/sub/LoungeChatWidget";
 
 // --- 1. CONFIGURAÇÃO DE IMPORTS (MODULOS CYBER) ---
 const LoadingModule = () => (
-    <div className="w-full h-full flex items-center justify-center text-cyan-500/50 animate-pulse text-xs tracking-widest uppercase">
-        Loading Cyber-Stream...
+    <div className="w-full h-full flex flex-col items-center justify-center text-cyan-500/50 animate-pulse gap-2">
+        <Terminal className="w-5 h-5 animate-bounce" />
+        <span className="text-[10px] tracking-[0.2em] uppercase font-mono">Loading Cyber-Stream...</span>
     </div>
 );
 
@@ -24,6 +25,9 @@ const ExamsModule = dynamic(() => import('./main-hall/exams/page').then(mod => m
 const ProjectsModule = dynamic(() => import('./main-hall/projects/page').then(mod => mod.default), { loading: LoadingModule });
 const ResearchModule = dynamic(() => import('./main-hall/researches/page').then(mod => mod.default), { loading: LoadingModule });
 const CommunityModule = dynamic(() => import('./main-hall/community/page').then(mod => mod.default), { loading: LoadingModule });
+// Novos módulos integrados
+const ProfileModule = dynamic(() => import('./main-hall/profile/page').then(mod => mod.default), { loading: LoadingModule });
+const NewsModule = dynamic(() => import('./main-hall/news/page').then(mod => mod.default), { loading: LoadingModule });
 
 // --- 2. LISTA DE CURSOS (PARTÍCULAS) ---
 const COURSE_KEYS = [
@@ -45,22 +49,65 @@ export default function ZaeonComputerScienceRoom() {
 
     // --- ESTADOS DA UI ---
     const [activeTab, setActiveTab] = useState("classes");
-    const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
     const [isFocusMode, setIsFocusMode] = useState(false);
     const [isMinimized, setIsMinimized] = useState(false);
 
-    // Sidebar Timer (Hover Intent)
-    const sidebarTimerRef = useRef<NodeJS.Timeout | null>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    // --- TABS ---
-    const [tabs, setTabs] = useState([
+    // --- TABS (BASE INICIAL UNIFICADA) ---
+    const baseTabs = [
+        { id: 'community', label: 'Communities', icon: <Users size={18} /> },
         { id: 'classes', label: 'Classes', icon: <BookOpen size={18} /> },
         { id: 'exams', label: 'Exams', icon: <ClipboardList size={18} /> },
         { id: 'projects', label: 'Projects', icon: <Cpu size={18} /> },
         { id: 'research', label: 'Research', icon: <Activity size={18} /> },
-        { id: 'community', label: 'Communities', icon: <Users size={18} /> },
-    ]);
+        { id: 'news', label: 'News', icon: <Newspaper size={18} /> }, 
+        { id: 'profile', label: 'Identity', icon: <UserCircle size={18} /> },
+    ];
+
+    const [tabs, setTabs] = useState(baseTabs);
+
+    // --- BUSCAR A ORDEM SALVA NO BANCO AO AUTENTICAR ---
+    useEffect(() => {
+        if (isAuthenticated) {
+            const fetchSavedOrder = async () => {
+                try {
+                    const res = await fetch('/api/user-space');
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data?.data?.layoutState?.sidebarOrder) {
+                            const savedOrder = data.data.layoutState.sidebarOrder;
+                            const newTabs = savedOrder
+                                .map((id: string) => baseTabs.find(t => t.id === id))
+                                .filter(Boolean);
+
+                            const missingTabs = baseTabs.filter(t => !savedOrder.includes(t.id));
+                            setTabs([...newTabs, ...missingTabs]);
+                        }
+                    }
+                } catch (error) {
+                    console.error("Erro ao buscar a ordem da sidebar", error);
+                }
+            };
+            fetchSavedOrder();
+        }
+    }, [isAuthenticated]);
+
+    // --- SALVAR A ORDEM NO BANCO QUANDO O USUÁRIO ARRASTAR ---
+    const handleReorder = async (newOrderTabs: any[]) => {
+        setTabs(newOrderTabs); 
+        const sidebarOrder = newOrderTabs.map(t => t.id);
+
+        try {
+            await fetch('/api/user-space', {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ layoutState: { sidebarOrder } })
+            });
+        } catch (error) {
+            console.error("Erro ao salvar a nova ordem da sidebar", error);
+        }
+    };
 
     // --- 1. SETUP INICIAL ---
     useEffect(() => {
@@ -68,9 +115,10 @@ export default function ZaeonComputerScienceRoom() {
         return () => clearTimeout(timer);
     }, []);
 
-    // --- 2. LÓGICA DE AUTENTICAÇÃO ("INIT") ---
+    // --- 2. LÓGICA DE AUTENTICAÇÃO ("npm run dev") ---
     const handleAuth = () => {
-        if (inputValue.toLowerCase() === "init") {
+        // Alterado o comando de inicialização
+        if (inputValue.trim() === "npm run dev") {
             setIsError(false);
             setIsAuthenticating(true);
             setTimeout(() => {
@@ -169,10 +217,6 @@ export default function ZaeonComputerScienceRoom() {
         };
     }, []);
 
-    // --- SIDEBAR LOGIC (Delay 2s) ---
-    const handleSidebarEnter = () => { sidebarTimerRef.current = setTimeout(() => setIsSidebarExpanded(true), 2000); };
-    const handleSidebarLeave = () => { if (sidebarTimerRef.current) clearTimeout(sidebarTimerRef.current); setIsSidebarExpanded(false); };
-
     // --- STYLES CYBER (Azul/Roxo/Slate) ---
     const cardStyle = `
         dark:bg-[#0f172a]/80 bg-white/60
@@ -219,9 +263,9 @@ export default function ZaeonComputerScienceRoom() {
                                         <div className={`border-l-2 pl-4 mb-6 ${isError ? 'border-red-500' : 'border-cyan-500'}`}>
                                             <h2 className={`font-bold text-lg flex items-center gap-2 ${isError ? 'text-red-400' : 'text-white'}`}>
                                                 {isError ? <XCircle size={18} /> : <Lock size={18} />}
-                                                {isError ? "Invalid Protocol" : "Secure Environment"}
+                                                {isError ? "Invalid Command" : "Secure Environment"}
                                             </h2>
-                                            <p className="text-[10px] uppercase tracking-widest mt-1 text-slate-400">Initialize Connection</p>
+                                            <p className="text-[10px] uppercase tracking-widest mt-1 text-slate-400">Initialize Dev Server</p>
                                         </div>
 
                                         <div className="space-y-4">
@@ -234,7 +278,7 @@ export default function ZaeonComputerScienceRoom() {
                                                         value={inputValue}
                                                         onChange={(e) => { setInputValue(e.target.value); setIsError(false); }}
                                                         onKeyDown={handleKeyDown}
-                                                        placeholder="Type 'init' to start..."
+                                                        placeholder="Type 'npm run dev' to start..."
                                                         className="bg-transparent border-none w-full text-white font-mono text-sm outline-none placeholder:text-slate-600"
                                                         autoFocus
                                                     />
@@ -247,7 +291,7 @@ export default function ZaeonComputerScienceRoom() {
                                     </>
                                 ) : (
                                     <div className="py-8 flex flex-col items-center justify-center gap-4">
-                                        <div className="text-cyan-400 font-mono text-sm animate-pulse">INITIALIZING CORE SYSTEMS...</div>
+                                        <div className="text-cyan-400 font-mono text-sm animate-pulse">STARTING DEVELOPMENT SERVER...</div>
                                         <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
                                             <motion.div
                                                 initial={{ width: 0 }}
@@ -257,7 +301,7 @@ export default function ZaeonComputerScienceRoom() {
                                             />
                                         </div>
                                         <div className="flex justify-between w-full text-[8px] text-slate-500 font-mono uppercase">
-                                            <span>Loading Modules</span>
+                                            <span>Compiling Modules</span>
                                             <span>100%</span>
                                         </div>
                                     </div>
@@ -286,33 +330,28 @@ export default function ZaeonComputerScienceRoom() {
                         animate={{ opacity: 1, y: 0, transition: { delay: 0.2, duration: 0.8 } }}
                         className={`flex items-start justify-start px-4 gap-6 w-full h-full relative z-10 transition-all duration-700 ${isFocusMode ? 'pt-4' : 'pt-32'}`}
                     >
-                        {/* SIDEBAR: Bem fina (w-12), nomes dos módulos aparecem ao expandir */}
+                        {/* SIDEBAR: Fina, estática, idêntica ao Lounge */}
                         <motion.aside
                             layout
-                            className={`z-20 rounded-[2.5rem] ${cardStyle} transition-all duration-500 flex flex-col items-center py-6 gap-4 
-                                ${isSidebarExpanded ? 'w-48 px-4' : 'w-12'} 
-                                ${isFocusMode ? 'h-[96vh]' : 'h-[70vh]'} 
-                            `}
-                            onMouseEnter={handleSidebarEnter}
-                            onMouseLeave={handleSidebarLeave}
+                            className={`z-20 rounded-[2.5rem] ${cardStyle} transition-all duration-500 flex flex-col items-center py-6 gap-4 w-12 ${isFocusMode ? 'h-[96vh]' : 'h-[70vh]'}`}
                         >
-                            <Reorder.Group axis="y" values={tabs} onReorder={setTabs} className="flex flex-col gap-2 w-full flex-1 justify-center">
+                            <Reorder.Group axis="y" values={tabs} onReorder={handleReorder} className="flex flex-col gap-2 w-full flex-1 justify-center">
                                 {tabs.map((item) => (
                                     <Reorder.Item key={item.id} value={item}>
                                         <button
                                             onClick={() => { setActiveTab(item.id); setIsMinimized(false); }}
-                                            className={`flex items-center gap-4 w-full p-3 rounded-xl transition-all relative overflow-hidden group
+                                            className={`flex items-center justify-center w-8 h-8 mx-auto rounded-xl transition-all relative overflow-hidden group
                                             ${activeTab === item.id
                                                     ? 'dark:bg-white/10 bg-[#0f172a] text-white shadow-lg border dark:border-white/10 border-transparent'
                                                     : 'dark:text-white/40 text-slate-500 hover:dark:text-white hover:text-[#0f172a]'
                                                 }`}
                                         >
                                             <div className="shrink-0 relative z-10 flex justify-center w-full">{item.icon}</div>
-                                            {isSidebarExpanded && (
-                                                <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[10px] font-black uppercase tracking-widest truncate relative z-10 whitespace-nowrap">
-                                                    {item.label}
-                                                </motion.span>
-                                            )}
+                                            
+                                            {/* Tooltip Hover Estilo Cyber */}
+                                            <span className="absolute left-full ml-4 px-2 py-1 bg-[#0f172a] border border-cyan-500/30 text-white text-[9px] rounded font-bold uppercase opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-lg shadow-cyan-500/10">
+                                                {item.label}
+                                            </span>
                                         </button>
                                     </Reorder.Item>
                                 ))}
@@ -321,7 +360,7 @@ export default function ZaeonComputerScienceRoom() {
                             <div className="w-full pt-4 mt-auto border-t dark:border-white/10 border-black/5">
                                 <button
                                     onClick={() => setIsFocusMode(!isFocusMode)}
-                                    className={`flex items-center gap-4 w-full p-3 rounded-xl transition-all 
+                                    className={`flex items-center justify-center w-8 h-8 mx-auto rounded-xl transition-all group relative
                                         ${isFocusMode
                                             ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
                                             : 'dark:text-white/40 text-slate-500 hover:dark:text-white hover:text-[#0f172a]'
@@ -330,11 +369,9 @@ export default function ZaeonComputerScienceRoom() {
                                     <div className="shrink-0 flex justify-center w-full">
                                         {isFocusMode ? <EyeOff size={18} /> : <Eye size={18} />}
                                     </div>
-                                    {isSidebarExpanded && (
-                                        <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[10px] font-black uppercase tracking-widest truncate">
-                                            {isFocusMode ? "Exit" : "Focus"}
-                                        </motion.span>
-                                    )}
+                                    <span className="absolute left-full ml-4 px-2 py-1 bg-[#0f172a] border border-cyan-500/30 text-white text-[9px] rounded font-bold uppercase opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-lg shadow-cyan-500/10">
+                                        {isFocusMode ? "Exit" : "Focus"}
+                                    </span>
                                 </button>
                             </div>
                         </motion.aside>
@@ -351,17 +388,13 @@ export default function ZaeonComputerScienceRoom() {
                                         ${isFocusMode ? 'h-[96vh]' : 'h-[82vh]'}
                                     `}
                                 >
-                                    {/* HEADER DA JANELA (ESTILO MAC - AMARELO ESQUERDA) */}
+                                    {/* HEADER DA JANELA (ESTILO MAC) */}
                                     <div className="p-10 pb-4 flex items-center gap-4 border-b dark:border-white/5 border-black/5">
-
-                                        {/* Botão Amarelo (Minimize) Estilo Mac */}
                                         <div
                                             onClick={() => setIsMinimized(true)}
                                             className="w-3 h-3 rounded-full bg-[#f59e0b] border border-[#d97706] shadow-sm cursor-pointer hover:bg-[#fbbf24] active:scale-95 transition-transform"
                                             title="Minimize Window"
                                         />
-
-                                        {/* Título do Módulo */}
                                         <h2 className="text-xl font-black uppercase tracking-[0.3em] dark:text-white text-[#0f172a] leading-none flex items-center gap-3">
                                             <Terminal className="w-6 h-6 text-cyan-500" />
                                             {tabs.find(t => t.id === activeTab)?.label}
@@ -378,11 +411,13 @@ export default function ZaeonComputerScienceRoom() {
                                                 transition={{ duration: 0.2 }}
                                                 className="h-full"
                                             >
+                                                {activeTab === 'news' && <NewsModule />} 
                                                 {activeTab === 'classes' && <ClassesModule />}
                                                 {activeTab === 'exams' && <ExamsModule />}
                                                 {activeTab === 'projects' && <ProjectsModule />}
                                                 {activeTab === 'research' && <ResearchModule />}
                                                 {activeTab === 'community' && <CommunityModule />}
+                                                {activeTab === 'profile' && <ProfileModule />}
                                             </motion.div>
                                         </AnimatePresence>
                                     </div>

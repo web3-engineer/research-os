@@ -17,9 +17,9 @@ import { Navbar } from "@/components/main/navbar";
 import { Footer } from "@/components/main/footer";
 
 // Carregamento dinâmico do background
-const StarsCanvas = dynamic(
-    () => import("@/components/main/star-background"),
-    { ssr: false }
+const ParticleSystem = dynamic(
+    () => import("@/components/main/ParticleSystem"),
+
 );
 
 export default function Home() {
@@ -72,7 +72,7 @@ export default function Home() {
                     {/* Nota: Se o seu HeroPage já tiver um StarBackground dentro dele, 
                         você pode remover este aqui ou remover o de dentro do HeroPage 
                         para evitar duplicidade e pesar o app. O ideal é manter ESTE aqui. */}
-                    <StarsCanvas />
+                    <ParticleSystem />
 
                     <Navbar />
 
