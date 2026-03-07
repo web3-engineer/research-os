@@ -1,7 +1,5 @@
 import Redis from 'ioredis';
 
-// Forçamos o uso da variável de ambiente. 
-// Se ela não existir, o processo deve avisar.
 const REDIS_URL = "rediss://default:AZdoAAIncDE1ZDUzMzY5ZmZiYzA0NThmODY4MGU0YzA4OGJhNTM3N3AxMzg3NjA@lenient-tadpole-38760.upstash.io:6379";
 const redisUrl = process.env.REDIS_URL || REDIS_URL;
 
