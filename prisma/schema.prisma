@@ -53,39 +53,39 @@ model User {
   userSpaceData UserSpaceData?
 }
 
-// --- MEMÓRIA DO LOUNGE & SALAS (ATUALIZADO) ---
+// --- MEMÓRIA DO LOUNGE & SALAS ---
 model UserSpaceData {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @unique @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  userId        String   @unique @db.ObjectId
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // --- STATE PERSISTENCE (Sincronizado com o Frontend) ---
+  // Base UI
+  layout    Json?    // Armazena janelas abertas e posições
+  settings  Json?    // Armazena tema e preferências
   
-  // 1. Layout & UI States (YearBoard toggle, Gadget On/Off, Plug Position, Sticky Visibility)
-  layoutState   Json?    // Ex: { showYearBoard: true, gadgetOn: false, pluggedDay: 2, showSticky: true }
-
-  // 2. Data Content
-  schedule      Json?    // Array de aulas (classes)
-  stickyNote    String?  // Texto do post-it
+  // State Persistence
+  layoutState     Json?    
+  schedule        Json?    
+  stickyNote      String?  
   
-  // 3. Modules Data
-  chatHistory   Json?    // Histórico do Assistant (Role: User/AI)
-  zaeonChat     Json?    // Histórico do Zaeon (Role: User/Agent)
-  library       Json?    // Docs salvos (storedPdfs)
-  fabricator    Json?    // Docs gerados (generatedDocs)
-  personalModules Json?  // Backpack & Archives (userModules)
+  // Modules & History
+  chatHistory     Json?    
+  zaeonChat       Json?    
+  library         Json?    
+  fabricator      Json?    
+  personalModules Json?    
 
-  // 4. Objectives (Profile Page)
-  objectives    Json?    // Matriz de hábitos
+  // Profile & Objectives
+  objectives      Json?    
 
-  // Legacy/Other
-  activeProject Json?    
-  citations     Json?    
-  workContent   String?  
-  workTitle     String?  
+  // Legacy/Work
+  activeProject   Json?    
+  citations       Json?    
+  workContent     String?  
+  workTitle       String?  
 
-  updatedAt     DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt // APENAS UMA VEZ AQUI
 }
 
 model SystemSetting {
@@ -161,4 +161,12 @@ model Session {
   userId       String   @db.ObjectId
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SystemLog {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String
+  action    String   
+  details   String?
+  createdAt DateTime @default(now())
 }
