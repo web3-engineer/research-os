@@ -11,6 +11,7 @@ import { NewsService } from './services/news.service';
 import { SystemService } from './services/system.service';
 import { LibraryService } from './services/library.service';
 import { zaeonGuard } from './middlewares/auth.middleware';
+import { LayoutService } from './services/layout.service';
 
 dotenv.config();
 
@@ -30,10 +31,25 @@ const io = new Server(httpServer, {
 
 // 3. Escutando novas conexões
 io.on('connection', (socket) => {
-  console.log(`🔌 Novo dispositivo conectado ao Zaeon: ${socket.id}`);
+  // O Frontend deve enviar o userId na conexão (query)
+  const userId = socket.handshake.query.userId as string;
+
+  if (userId) {
+    console.log(`📡 Usuário ${userId} conectou ao Zaeon (Socket: ${socket.id})`);
+    
+    // Marcamos como Online no Banco
+    UserService.updateStatus(userId, true);
+    
+    // Avisamos a todos em tempo real
+    io.emit('USER_STATUS_CHANGED', { userId, online: true });
+  }
 
   socket.on('disconnect', () => {
-    console.log('💤 Dispositivo desconectado');
+    if (userId) {
+      console.log(`💤 Usuário ${userId} saiu do sistema.`);
+      UserService.updateStatus(userId, false);
+      io.emit('USER_STATUS_CHANGED', { userId, online: false });
+    }
   });
 });
 
@@ -198,6 +214,12 @@ app.post('/library/save', zaeonGuard, async (req, res) => {
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
+});
+
+app.post('/layout/save', async (req, res) => {
+  const { userId, windows } = req.body;
+  const updated = await LayoutService.saveLayout(userId, windows);
+  res.json(updated);
 });
 
 export { io };

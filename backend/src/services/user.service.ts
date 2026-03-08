@@ -59,4 +59,16 @@ export class UserService {
             }
         });
     }
+
+    static async updateStatus(userId: string, isOnline: boolean) {
+    try {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { isOnline } 
+      });
+      console.log(`[DB] ${userId} agora está ${isOnline ? '🟢 ONLINE' : '🔴 OFFLINE'}`);
+    } catch (error) {
+      console.error("Erro ao atualizar status no banco:", error);
+    }
+  }
 }

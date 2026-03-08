@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { LogService } from './log.service';
 import { UserService } from './user.service';
+import { NotificationService } from './notification.service'; 
 import { io } from '../server'; 
 
 export class PostService {
@@ -84,6 +85,15 @@ export class PostService {
             data: { likes: updatedLikes }
         });
 
+        // Se alguém deu like (e não foi o próprio autor do post), notificamos!
+        if (updatedLikes.includes(userId) && updatedPost.userId !== userId) {
+            NotificationService.send(
+            updatedPost.userId!, 
+                "Novo Like! ❤️", 
+                "Alguém curtiu sua publicação no Lounge.",
+                "success"
+            );
+        }
         // Emite o evento de Like para atualização instantânea no Front
         io.emit('POST_LIKED', { postId, userId, likesCount: updatedPost.likes.length });
 
