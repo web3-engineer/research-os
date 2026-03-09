@@ -1,125 +1,113 @@
-import Groq from "groq-sdk";
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
+import { VertexAI } from '@google-cloud/vertexai';
+import type { FunctionDeclaration } from '@google-cloud/vertexai'; // Correção 1: Import type-only
+import Groq from 'groq-sdk';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
-const groq = new Groq({
-    apiKey: process.env.GROQ_API_KEY
-});
-
-// --- 1. DEFINIÇÃO DA FERRAMENTA DE AGENDA (Function Calling) ---
-// Isso diz para a IA: "Se precisar mexer na agenda, use esta ferramenta"
-const tools = [
-    {
-        type: "function" as const,
-        function: {
-            name: "update_schedule",
-            description: "Adiciona, remove ou atualiza uma aula/evento na agenda semanal do usuário.",
-            parameters: {
-                type: "object",
-                properties: {
-                    action: {
-                        type: "string",
-                        enum: ["add", "remove", "update"],
-                        description: "A ação a ser realizada."
-                    },
-                    day: {
-                        type: "number",
-                        enum: [1, 2, 3, 4, 5],
-                        description: "Dia da semana: 1=Segunda, 2=Terça, 3=Quarta, 4=Quinta, 5=Sexta."
-                    },
-                    hour: {
-                        type: "number",
-                        description: "Hora da aula (formato 24h, ex: 14 para 14:00)."
-                    },
-                    name: { type: "string", description: "Nome da matéria ou evento." },
-                    teacher: { type: "string", description: "Nome do professor ou mentor." },
-                    room: { type: "string", description: "Sala ou local (ex: Lab 402, Virtual)." }
-                },
-                required: ["action", "day", "hour"]
-            }
-        }
+// --- 1. DEFINIÇÃO DA FERRAMENTA DE AGENDA (Function Calling - Gemini) ---
+const updateScheduleTool: FunctionDeclaration = {
+    name: "update_schedule",
+    description: "Adiciona, remove ou atualiza uma aula na agenda acadêmica do aluno.",
+    parameters: {
+        // Correção 2: Passando as strings diretamente para evitar o erro do enum 'Type'
+        type: "OBJECT" as any, 
+        properties: {
+            action: { type: "STRING" as any, description: "Ação: 'add', 'remove', ou 'update'." },
+            day: { type: "INTEGER" as any, description: "Dia da semana. 1 = Segunda, 2 = Terça, 3 = Quarta, 4 = Quinta, 5 = Sexta." },
+            hour: { type: "INTEGER" as any, description: "Hora de início da aula. Formato 24h (ex: 8, 10, 14)." },
+            name: { type: "STRING" as any, description: "Nome da disciplina." },
+            teacher: { type: "STRING" as any, description: "Nome do professor." },
+            room: { type: "STRING" as any, description: "Local ou sala." },
+            duration: { type: "INTEGER" as any, description: "Duração da aula em horas. Padrão 2." }
+        },
+        required: ["action", "day", "hour"]
     }
-];
+};
 
-// --- 2. PERSONALIDADES (Trazidas do código antigo) ---
+// --- 2. PERSONALIDADES DOS AGENTES ---
 const AGENT_PERSONAS: Record<string, string> = {
-    zenita: `Você é a Zenita, uma IA raposa cyberpunk sarcástica e técnica.
-             Você ajuda o usuário a organizar a vida acadêmica e projetos.
-             Se o usuário pedir para mudar a agenda, USE A FERRAMENTA 'update_schedule'.`,
-    
-    ethernaut: `Você é o Ethernaut, especialista sênior em Blockchain e Sistemas.
-                Foco em precisão técnica e dados.`,
-                
-    aura: `Você é "Aura", o Concierge Pessoal.
-           Seu objetivo é organizar a vida do usuário.
-           Se o usuário pedir para mudar a agenda, USE A FERRAMENTA 'update_schedule'.`
+    zenita: `Você é a Zenita, assistente acadêmica do Zaeon OS. Se o usuário pedir para adicionar, apagar ou editar aulas, USE A FERRAMENTA 'update_schedule'. Nunca responda com longos textos para tarefas de agenda.`,
+    aura: `Você é Aura, especialista em insights de pesquisa. Analise os documentos fornecidos e responda de forma clara, técnica e concisa.`,
+    scholar: `Você é um Gerador de Citações. Seu objetivo é extrair trechos vitais do documento e gerar referências estritas nas normas ABNT (Brasileira) e APA (Americana).`,
+    scribe: `Você é um Escritor Acadêmico. Reescreva os textos do usuário com tom formal, impessoal e acadêmico. Explique rapidamente por que a sua versão é melhor.`,
+    examiner: `Você é o Testador de Conhecimento. Crie quizzes desafiadores baseados no documento fornecido. Gere as perguntas, espere a resposta, e depois avalie.`,
+    zaeon: `Você é o Ethernaut Zaeon. Especialista em criação de documentos. Auxilie na leitura de PDFs e estruture informações para o Fabricator.`
 };
 
 export async function POST(req: Request) {
-    console.log("🚀 [API START] Iniciando Chat com Groq AI...");
-
     try {
-        const { prompt, agent, systemContext } = await req.json();
+        const { prompt, agent, systemContext, fileData } = await req.json();
+        const agentKey = agent?.toLowerCase() || "aura";
+        const persona = AGENT_PERSONAS[agentKey] || AGENT_PERSONAS.aura;
 
-        // 1. Seleciona a Persona
-        const selectedPersona = AGENT_PERSONAS[agent?.toLowerCase()] || AGENT_PERSONAS.zenita;
+        // =================================================================
+        // ROTA GROQ (OCULTA / DESLIGADA)
+        // =================================================================
+        if (agentKey === "groq_bypassed") {
+            const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+            const completion = await groq.chat.completions.create({
+                messages: [{ role: "system", content: persona }, { role: "user", content: prompt }],
+                model: "llama-3.3-70b-versatile",
+                temperature: 0.6,
+            });
+            return NextResponse.json({ text: completion.choices[0]?.message?.content });
+        }
 
-        // 2. Monta o System Prompt com Contexto da Agenda
-        const systemInstruction = `
-            ${selectedPersona}
-            
-            [CONTEXTO ATUAL DA AGENDA]:
-            ${systemContext ? systemContext : "Nenhuma agenda carregada."}
-            
-            [REGRAS]:
-            - Se o usuário pedir para adicionar/remover/mudar aula, NÃO responda apenas com texto. CHAME a função 'update_schedule'.
-            - Dias: 1=Seg, 2=Ter, 3=Qua, 4=Qui, 5=Sex.
-        `;
-
-        const messages: any[] = [
-            { role: "system", content: systemInstruction },
-            { role: "user", content: prompt }
-        ];
-
-        // 3. Chamada Groq com Tools
-        console.log("⚡ Enviando requisição para Groq...");
-        
-        const completion = await groq.chat.completions.create({
-            messages: messages,
-            model: "llama-3.3-70b-versatile",
-            temperature: 0.6,
-            max_tokens: 1024,
-            tools: tools,           // Habilita ferramentas
-            tool_choice: "auto"     // Deixa a IA decidir se usa ou não
+        // =================================================================
+        // ROTA GEMINI (VERTEX AI) - ATIVA E MULTIMODAL
+        // =================================================================
+        const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS || "{}");
+        const vertexAI = new VertexAI({
+            project: credentials.project_id || process.env.GOOGLE_PROJECT_ID,
+            location: process.env.GOOGLE_LOCATION || 'us-central1',
+            googleAuthOptions: { credentials: { client_email: credentials.client_email, private_key: credentials.private_key } }
         });
 
-        const responseMessage = completion.choices[0]?.message;
-        const toolCalls = responseMessage?.tool_calls;
+        // Configurações do Modelo
+        const tools = agentKey === "zenita" ? [{ functionDeclarations: [updateScheduleTool] }] : undefined;
+        const generativeModel = vertexAI.getGenerativeModel({
+            model: 'gemini-1.5-flash',
+            generationConfig: { temperature: 0.4 },
+            tools: tools
+        });
 
-        // 4. Se a IA decidiu chamar a ferramenta (Mágica acontece aqui)
-        if (toolCalls && toolCalls.length > 0) {
-            console.log("🛠️ IA solicitou alteração na agenda:", toolCalls[0].function.name);
-            
+        // Montando o conteúdo (Texto + Base64 do PDF se existir)
+        const parts: any[] = [];
+        if (fileData) {
+            parts.push({
+                inlineData: { data: fileData, mimeType: "application/pdf" }
+            });
+        }
+        parts.push({ text: prompt });
+
+        // Instruções de Sistema
+        let finalSystemInstruction = persona;
+        if (systemContext) finalSystemInstruction += `\n[CONTEXTO DE SISTEMA]: ${systemContext}`;
+
+        const chat = generativeModel.startChat({
+            systemInstruction: { role: 'system', parts: [{ text: finalSystemInstruction }] }
+        });
+
+        const result = await chat.sendMessage(parts);
+        const response = result.response;
+
+        // Verifica se o Gemini acionou a ferramenta de Agenda (Zenita)
+        const functionCall = response.candidates?.[0]?.content?.parts?.[0]?.functionCall;
+        if (functionCall) {
             return NextResponse.json({
-                text: "Processando alteração na agenda...", // Feedback visual rápido
-                toolCall: {
-                    name: toolCalls[0].function.name,
-                    args: JSON.parse(toolCalls[0].function.arguments)
-                }
+                toolCall: { name: functionCall.name, args: functionCall.args },
+                text: "Ação de agenda interceptada e processada via UI."
             });
         }
 
-        // 5. Resposta normal de texto
-        const text = responseMessage?.content;
-        return NextResponse.json({ text });
+        // Retorna a resposta normal de texto
+        const textResponse = response.candidates?.[0]?.content?.parts?.[0]?.text || "Sem resposta do núcleo.";
+        return NextResponse.json({ text: textResponse });
 
     } catch (error: any) {
-        console.error("🔥 ERRO FATAL (Groq):", error);
-        return NextResponse.json({ 
-            error: "Erro no processamento com Groq", 
-            details: error.message 
-        }, { status: 500 });
+        console.error("Erro na API Neural:", error);
+        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 }

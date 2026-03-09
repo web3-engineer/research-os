@@ -205,7 +205,11 @@ export default function HomeworkPage() {
         try {
             const base64Data = await fileToBase64(doc.file);
             setActiveFileContext(base64Data);
-            const response = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: `Analise o documento "${doc.title}" e me dê um resumo conciso.`, agent: "zenita", fileData: base64Data }) });
+            const response = await fetch('/api/chat', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ prompt: `Analise o documento "${doc.title}" e me dê um resumo conciso.`, agent: "aura", fileData: base64Data }) 
+            });
             if (!response.ok) throw new Error("Falha na API");
             const data = await response.json();
             setStudyChatHistory(prev => [...prev, { role: 'ai', text: `[Contexto Definido: ${doc.title}]\n\n${data.text}` }]);
@@ -236,23 +240,21 @@ export default function HomeworkPage() {
     // --- SPECIALIZED ACTIONS ---
     const handleGenerateCitations = async () => {
         if (!activeFileContext) { alert("Please load a PDF document first (drag PDF -> click Play)."); return; }
-        addLog("✨ Scholar Agent: Extracting Vancouver Citations...");
+        addLog("✨ Scholar Agent: Extracting Citations (ABNT & APA)...");
         
         const citationPrompt = `
             Extract 3 significant verbatim excerpts (entire paragraphs) from the document that are crucial for research.
-            For each excerpt, provide the reference strictly in **Vancouver Style** (numeric system).
+            For each excerpt, provide the reference strictly in **ABNT (Brazilian)** and **APA (American)** styles.
             
             Output format:
-            1. "Excerpt text..." (1)
-            2. "Excerpt text..." (2)
-            
-            References:
-            1. Author AA. Title of work. Location: Publisher; Year.
+            1. "Excerpt text..."
+            - ABNT: Reference ABNT
+            - APA: Reference APA
         `;
 
         const result = await handleAgentAction('scholar', citationPrompt, true);
         setCitationContent(result);
-        addLog("✅ Citations generated in Vancouver format.");
+        addLog("✅ Citations generated successfully.");
     };
 
     const handleSaveCitation = async () => {
@@ -281,7 +283,11 @@ export default function HomeworkPage() {
             ...prev,
             [specialistType]: [...prev[specialistType], { role: 'user', text: inputVal }]
         }));
-        const result = await handleAgentAction(specialistType, inputVal, false);
+        
+        // Passa o PDF context apenas para o Examiner (para criar as provas)
+        const usePdf = specialistType === 'examiner';
+        const result = await handleAgentAction(specialistType, inputVal, usePdf);
+        
         setSpecialistChatHistory(prev => ({
             ...prev,
             [specialistType]: [...prev[specialistType], { role: 'ai', text: result }]
@@ -380,7 +386,6 @@ export default function HomeworkPage() {
 
             const userId = session?.user?.email || "anonymous_user";
             
-            // NOTE: Ensure your Prisma schema has 'workContent' and 'workTitle' fields
             const res = await fetch('/api/workspace', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
