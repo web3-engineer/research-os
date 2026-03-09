@@ -38,7 +38,7 @@ export const authOptions: NextAuthOptions = {
                     // @ts-ignore
                     session.user.course = dbUser.course || "";
                     // @ts-ignore
-                    session.user.isAdmin = dbUser.email === "donmartinezcaiudoceu@gmail.com";
+                    session.user.isAdmin = dbUser.email === "[EMAIL_ADDRESS]";
                 }
             }
             return session;

@@ -118,7 +118,7 @@ const MatrixRain: React.FC = () => {
             time += SNAKE_SPEED;
 
             // POSIÇÃO DO GLOBO: Movido mais para a direita (0.82)
-            const centerX = width * 0.78;
+            const centerX = width * 0.80;
             const centerY = height * 0.4;
             const screenCenterX = width * 0.5;
             const globeRadius = Math.min(width, height) * GLOBE_RADIUS_RATIO;

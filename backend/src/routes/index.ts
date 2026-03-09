@@ -3,6 +3,8 @@ import { PrismaClient } from '@prisma/client';
 import { chatWithZaeon } from '../controllers/ai.controller';
 import { agentCommand, agentLog } from '../controllers/agent.controller';
 import { syncUserSpace, getUserSpace } from "../controllers/user.controller";
+import { createRoom, getRooms } from "../controllers/room.Controller";
+
 const router = Router();
 const prisma = new PrismaClient();
 
@@ -11,65 +13,52 @@ router.get('/health', (req, res) => {
     res.json({ status: 'Zaeon OS Backend is alive' });
 });
 
-// Sincronização do Workspace
-router.post('/system/sync', async (req, res) => {
-    const userId = req.headers['x-user-id'] as string;
-    const { layoutState, stickyNote, chatHistory } = req.body;
-
-    try {
-        const updatedSpace = await prisma.userSpaceData.upsert({
-            where: { userId },
-            update: { layoutState, stickyNote, chatHistory },
-            create: { userId, layoutState, stickyNote, chatHistory }
-        });
-        res.json(updatedSpace);
-    } catch (error: any) {
-        console.error("❌ ERRO NO PRISMA:", error); // Isso vai imprimir no terminal do servidor
-        res.status(500).json({
-            error: "Erro ao sincronizar dados",
-            message: error.message, // Isso vai aparecer no seu CURL
-            code: error.code
-        });
-    }
-});
-// Feed de Notícias/Postagens
+// --- FEED DE NOTÍCIAS / POSTAGENS ---
 router.post('/feed/post', async (req, res) => {
     const userId = req.headers['x-user-id'] as string;
-    const { content, room } = req.body;
+    const { content, roomId } = req.body; // Mudamos de room para roomId
 
     try {
         const post = await prisma.post.create({
             data: {
                 content,
-                room,
+                roomId, // Agora aponta para o ID da coleção Room
                 userId,
-                user: "Usuário Teste", // Simplificado para MVP
+                user: "Usuário Teste",
                 userImage: ""
             }
         });
         res.json(post);
     } catch (error) {
-        res.status(500).json({ error: "Erro ao criar post" });
+        console.error("Erro ao criar post:", error);
+        res.status(500).json({ error: "Erro ao criar post. Verifique se o roomId é válido." });
     }
 });
 
-router.get('/feed/:room', async (req, res) => {
-    const { room } = req.params;
-    const posts = await prisma.post.findMany({
-        where: { room },
-        orderBy: { createdAt: 'desc' }
-    });
-    res.json(posts);
+router.get('/feed/:roomId', async (req, res) => {
+    const { roomId } = req.params;
+    try {
+        const posts = await prisma.post.findMany({
+            where: { roomId }, // Busca pelo ID da sala
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json(posts);
+    } catch (error) {
+        res.status(500).json({ error: "Erro ao buscar posts" });
+    }
 });
 
+// --- AI & AGENTS ---
 router.post('/ai/chat', chatWithZaeon);
-
 router.post('/agent/command', agentCommand);
-
 router.post('/agent/log', agentLog);
 
+// --- USER SPACE (Sincronização) ---
 router.post("/sync", syncUserSpace);
-
 router.get("/state/:userId", getUserSpace);
+
+// --- ROOMS (Salas) ---
+router.post("/rooms", createRoom);
+router.get("/rooms", getRooms);
 
 export default router;

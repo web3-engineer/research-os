@@ -45,7 +45,7 @@ export default function HeroPage() {
         className="absolute -right-80 top-20 bottom-0 w-[85vw] h-[900px] max-w-none pointer-events-none z-10 hidden lg:block overflow-hidden"
       >
         <Image
-          src="/assets/computer.png"
+          src="/assets/zaeon-ai.png"
           alt="Workstation Image"
           fill
           className="object-right object-top object-contain opacity-95"

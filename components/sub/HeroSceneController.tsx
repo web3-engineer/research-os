@@ -12,7 +12,7 @@ export default function HeroSceneController() {
   const lastScrollY = useRef(0);
 
   // LARGURA FIXA PARA EVITAR DISCREPÂNCIA ENTRE IDIOMAS
-const fixedWidth = "w-[520px] min-w-[520px] max-w-[820px]";
+  const fixedWidth = "w-[520px] min-w-[520px] max-w-[820px]";
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
@@ -29,47 +29,47 @@ const fixedWidth = "w-[520px] min-w-[520px] max-w-[820px]";
   return (
     <>
       {/* IMAGEM LATERAL */}
-      <motion.div 
+      <motion.div
         initial={{ x: "100%", opacity: 0 }}
         animate={{ x: show ? 0 : "100%", opacity: show ? 1 : 0 }}
         transition={transition}
         className="absolute -right-80 top-20 bottom-0 w-[85vw] pointer-events-none z-10 hidden lg:block overflow-hidden"
       >
-        <Image 
-          src="/assets/computer.png" 
-          alt="Workstation" 
-          fill 
-          className="object-right object-top object-contain" 
-          priority 
+        <Image
+          src="/assets/zaeon-ai.png"
+          alt="zaeon-ai"
+          fill
+          className="object-right object-top object-contain"
+          priority
         />
       </motion.div>
 
       {/* CONTEÚDO PRINCIPAL - COLUNA COM LARGURA TRAVADA */}
       <div className={`flex flex-col items-start z-20 ${fixedWidth}`}>
-        
-        <motion.div 
+
+        <motion.div
           className="w-full"
-          initial={{ x: "-100%", opacity: 0 }} 
-          animate={{ x: show ? 0 : "-100%", opacity: show ? 1 : 0 }} 
+          initial={{ x: "-100%", opacity: 0 }}
+          animate={{ x: show ? 0 : "-100%", opacity: show ? 1 : 0 }}
           transition={transition}
         >
           {/* Passamos a largura total para o componente de menu */}
           <MenuNavigation />
         </motion.div>
 
-        <motion.div 
+        <motion.div
           className="mt-4 w-full"
           initial={{ x: "-120%", opacity: 0 }}
           animate={{ x: show ? 0 : "-120%", opacity: show ? 1 : 0 }}
           transition={{ ...transition, delay: 0.1 }}
         >
-          <GameHint 
-            isVisible={show} 
+          <GameHint
+            isVisible={show}
             hints={[
-              t("hints.new_game"), 
-              t("hints.save_progress"), 
+              t("hints.new_game"),
+              t("hints.save_progress"),
               t("hints.roles")
-            ]} 
+            ]}
           />
         </motion.div>
       </div>
