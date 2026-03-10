@@ -1,0 +1,53 @@
+# .sourcery.yaml - PROTOCOLO DE ACRÉSCIMO ZAEON OS
+# Diretriz: "Novas implementações somam, nunca subtraem."
+# .sourcery.yaml
+
+ignore:
+  - "node_modules/**"
+  - "dist/**"
+  - "build/**"
+
+rules:
+  # ... (suas regras de preservação que criamos antes)
+  
+rules:
+  # 1. BLOQUEIO DE SUBSTITUIÇÃO DE MÉTODOS
+  - id: zaeon-no-replacement
+    description: "PROIBIDO: Substituir métodos existentes por novos."
+    pattern: |
+      class $CLASS:
+          - $OLD_METHOD(...) { ... }
+    replacement: |
+      class $CLASS:
+          - $OLD_METHOD(...) { ... }
+          - $NEW_METHOD(...) { ... }
+    explanation: "Se uma nova lógica for necessária (como roomId), crie um novo método ou uma sobrecarga, mas mantenha o método original (como getLoungeFeed) intacto e funcional."
+
+  # 2. PRESERVAÇÃO DE ASSINATURA ORIGINAL
+  - id: zaeon-preserve-signature
+    description: "PROIBIDO: Mudar a quantidade de argumentos obrigatórios de funções legadas."
+    pattern: "static async $FUNC($ARG1, $ARG2)"
+    condition: "method_was_previously_tested"
+    explanation: "Não transforme PostService.createPost(userId, content) em algo que exige 3 argumentos sem tratar o caso de 2 argumentos (fallback). O contrato original deve ser respeitado."
+
+  # 3. ACÚMULO DE EVENTOS (SOCKET/LOGS)
+  - id: zaeon-event-accumulation
+    description: "REGRA: Novos eventos de sistema devem ser disparados JUNTO com os antigos."
+    pattern: |
+      io.emit($OLD_EVENT, $DATA)
+    replacement: |
+      io.emit($OLD_EVENT, $DATA)
+      io.to($ROOM).emit($NEW_EVENT, $DATA)
+    explanation: "Ao adicionar lógica de salas, o evento global (Lounge) deve continuar sendo disparado para não quebrar componentes do Front que já o escutam."
+
+  # 4. MANUTENÇÃO DE GATILHOS (XP/LOGS)
+  - id: zaeon-logic-preservation
+    description: "REGRA: Não remova chamadas de UserService ou LogService de dentro de funções existentes."
+    pattern: "await $SERVICE.$METHOD($ARGS)"
+    condition: "name in ['LogService', 'UserService', 'NotificationService']"
+    explanation: "Toda lógica de recompensa e auditoria já implementada é parte integrante do sistema e não pode ser removida em refatorações."
+
+# Configuração para ignorar sugestões de "Simplificação" que removam redundância intencional
+refactor:
+  remove_redundant_code: false
+  simplify_code: false

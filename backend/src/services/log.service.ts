@@ -19,4 +19,18 @@ export class LogService {
             orderBy: { createdAt: 'desc' }
         });
     }
+    
+    static async register(userId: string, action: string, details?: string) {
+        try {
+            return await prisma.systemLog.create({
+            data: {
+            userId,
+            action,
+            details
+        }
+      });
+    } catch (error) {
+      console.error("Erro ao gravar log do sistema:", error);
+    }
+  }
 }

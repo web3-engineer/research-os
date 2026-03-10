@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
+import { ZaeonFlowEngine } from "../services/flow.Engine";
 
 export const syncUserSpace = async (req: Request, res: Response) => {
   const userId = req.headers["x-user-id"] as string;
@@ -23,6 +24,14 @@ export const syncUserSpace = async (req: Request, res: Response) => {
         stickyNote: data.stickyNote,
       },
     });
+
+    // 🔥 GATILHO DE AUTOMAÇÃO: Avisa que o espaço foi sincronizado
+    // Isso permite criar automações como: "Se a nota mudar, faça tal coisa"
+    ZaeonFlowEngine.triggerEvent(userId, "SPACE_SYNCED", {
+      hasStickyNote: !!data.stickyNote,
+      updatedAt: new Date()
+    });
+
     res.json(updatedSpace);
   } catch (error) {
     res.status(500).json({ error: "Erro ao sincronizar dados" });
