@@ -1,152 +1,166 @@
-import 'dotenv/config'; 
-import express from "express";
-import { createServer } from 'http';
-import { Server } from 'socket.io';
+import express from 'express';
 import cors from 'cors';
-import { z } from 'zod';
-import { FeedService } from './services/feed.service';
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import Redis from 'ioredis';
-import { prisma } from './lib/prisma';
+import dotenv from 'dotenv';
+import { WorkspaceService } from './services/workspace.service';
+import { UserService } from './services/user.service';
+import { PostService } from './services/post.service';
+import { LogService } from './services/log.service';
+import { NewsService } from './services/news.service';
+import { SystemService } from './services/system.service';
 
-const redis = new Redis(process.env.REDIS_URL || "");
-
-redis.on('connect', () => console.log('✅ Redis: Conectado com sucesso!'));
-redis.on('error', (err) => console.error('❌ Redis Erro:', err));
-
-// 2. Configuração do Gemini (Simplificada para evitar o erro 404)
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const aiModel = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash" // Use apenas o nome, sem o prefixo 'models/'
-});
+dotenv.config();
 
 const app = express();
-const httpServer = createServer(app);
-
-const io = new Server(httpServer, {
-    cors: {
-        origin: process.env.FRONTEND_URL || "http://localhost:3000",
-        methods: ["GET", "POST"]
-    }
-});
-
 app.use(cors());
 app.use(express.json());
 
-// --- Socket.io Logic ---
-io.on('connection', (socket) => {
-    console.log('🌐 Cliente conectado:', socket.id);
-    socket.on('join-room', (userId) => {
-        socket.join(userId);
-        console.log(`👤 Usuário ${userId} monitorando notificações.`);
-    });
-    socket.on('disconnect', () => {
-        console.log('❌ Cliente desconectado');
-    });
-});
-
-export { io };
-
-// --- Rotas ---
-
-app.post("/agent", async (req, res) => {
+app.post('/user-space/save', async (req, res) => {
     try {
-        const { message, userId } = req.body as { message?: string, userId?: string };
-        if (!message || !userId) return res.status(400).json({ error: "message and userId are required" });
+        const { userId } = req.body;
+        if (!userId) return res.status(400).json({ error: "userId is required" });
 
-        // 1. Buscar memória no MongoDB
-        const spaceData = await prisma.userSpaceData.findUnique({ where: { userId } });
-        const history = Array.isArray(spaceData?.zaeonChat) ? (spaceData.zaeonChat as any[]) : [];
-
-        // 2. Formatar contents para a API
-        const contents = [
-            ...history.map(h => ({
-                role: h.role === 'user' ? 'user' : 'model',
-                parts: [{ text: h.content }]
-            })),
-            { role: 'user', parts: [{ text: message }] }
-        ];
-
-        // 3. Chamada de IA - USANDO A URL V1 (MAIS ESTÁVEL)
-        const apiKey = process.env.GEMINI_API_KEY;
-
-        // Mude para o Lite, que costuma ter cota livre quando o normal está zerado
-        const modelName = "models/gemini-2.0-flash-lite"; 
-
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1/${modelName}:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents })
-        });
-
-        const data: any = await response.json();
-
-        if (!response.ok) {
-            console.error("❌ Resposta do Google não foi OK:", JSON.stringify(data, null, 2));
-            throw new Error(data.error?.message || "Erro na API do Google");
-        }
-
-        const replyText = data.candidates[0].content.parts[0].text;
-
-        // 4. Salvar no MongoDB
-        const updatedChat = [
-            ...history,
-            { role: 'user', content: message, timestamp: new Date() },
-            { role: 'model', content: replyText, timestamp: new Date() }
-        ];
-
-        await prisma.userSpaceData.upsert({
-            where: { userId },
-            update: { zaeonChat: updatedChat },
-            create: { userId, zaeonChat: updatedChat }
-        });
-
-        return res.json({ ok: true, reply: replyText });
-
-    } catch (err: any) {
-        console.error("❌ ERRO NO AGENTE:", err.message);
-        return res.status(500).json({ error: "internal_error", details: err.message });
+        // Note: Use o nome exato da função que está no seu Service
+        const result = await WorkspaceService.saveWorkspace(userId, req.body);
+        res.json(result);
+    } catch (error: any) {
+        console.error("❌ Erro no Backend:", error.message);
+        res.status(500).json({ error: error.message });
     }
 });
 
-// --- Outras Rotas do Feed ---
-app.get("/api/feed", async (req, res) => {
+// Rota para pegar o perfil
+app.get('/user/profile/:id', async (req, res) => {
     try {
-        const feed = await FeedService.getFeed();
+        const profile = await UserService.getUserProfile(req.params.id);
+        if (!profile) return res.status(404).json({ error: "Perfil não encontrado" });
+        res.json(profile);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Rota para atualizar o perfil
+app.patch('/user/profile/:id', async (req, res) => {
+    try {
+        const updated = await UserService.updateProfile(req.params.id, req.body);
+        res.json(updated);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Rota para ganhar XP (ex: quando o usuário completa uma tarefa no OS)
+app.post('/user/add-xp', async (req, res) => {
+    try {
+        const { userId, amount } = req.body;
+        const result = await UserService.addExperience(userId, amount);
+        res.json({ message: "XP Adicionado!", user: result });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/user/setup-test', async (req, res) => {
+    try {
+        const { id, name, email } = req.body;
+        const user = await UserService.createUser(id, name, email);
+        res.json(user);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Rota para postar no Lounge
+app.post('/lounge/post', async (req, res) => {
+    try {
+        const { userId, content } = req.body;
+        const post = await PostService.createPost(userId, content);
+        res.json(post);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Rota para ver o Feed
+app.get('/lounge/feed', async (req, res) => {
+    try {
+        const feed = await PostService.getLoungeFeed();
         res.json(feed);
-    } catch (error) {
-        res.status(500).json({ error: "Falha ao carregar feed" });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
     }
 });
 
-app.post("/api/feed/post", async (req, res) => {
-    await FeedService.invalidateCache();
-    io.emit('feed-updated', { message: "Novas postagens no Lounge!" });
-    res.status(201).json({ success: true });
+// Rota para comentar
+app.post('/lounge/comment', async (req, res) => {
+    try {
+        const { postId, userId, content } = req.body;
+        const comment = await PostService.addComment(postId, userId, content);
+        res.json(comment);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
-// Middleware de Erro Global
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    if (err instanceof z.ZodError) {
-        return res.status(400).json({ error: "Erro de validação", details: err.issues });
+// Rota para Like
+app.post('/lounge/like', async (req, res) => {
+    try {
+        const { postId, userId } = req.body;
+        const updatedPost = await PostService.toggleLike(postId, userId);
+        res.json(updatedPost);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
     }
-    console.error(err.stack);
-    res.status(500).json({ error: "Erro interno no servidor" });
+});
+
+// Rota para ver os logs (Admin)
+app.get('/system/logs', async (req, res) => {
+    try {
+        const logs = await LogService.getLogs();
+        res.json(logs);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/news/create', async (req, res) => {
+    try {
+        const news = await NewsService.createNews(req.body);
+        res.json(news);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/news/list', async (req, res) => {
+    try {
+        const news = await NewsService.getAllNews();
+        res.json(news);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/system/settings', async (req, res) => {
+    try {
+        const { key, value } = req.body;
+        const setting = await SystemService.setSetting(key, value);
+        res.json(setting);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/system/settings/:key', async (req, res) => {
+    try {
+        const setting = await SystemService.getSetting(req.params.key);
+        res.json(setting);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 const PORT = process.env.PORT || 3001;
-httpServer.listen(PORT, () => {
-    console.log(`🚀 Zaeon Agent Service ativo na porta ${PORT}`);
+app.listen(PORT, () => {
+    console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
 });
-
-async function checkAvailableModels() {
-    const apiKey = process.env.GEMINI_API_KEY;
-    try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`);
-        const data: any = await res.json();
-        console.log("📋 Modelos que sua chave enxerga:", data.models?.map((m: any) => m.name));
-    } catch (e) {
-        console.error("Falha ao listar modelos.");
-    }
-}
-checkAvailableModels();

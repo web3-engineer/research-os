@@ -1,33 +1,29 @@
-import redis from '../lib/redis';
-import { prisma } from '../lib/prisma'; 
+import { prisma } from '../lib/prisma';
+import Redis from 'ioredis';
+
+const redis = new Redis(process.env.REDIS_URL || "");
 
 export class FeedService {
-    private static CACHE_KEY = 'zaeon:feed:latest';
+    static async getFeed() {
+        try {
+            const cached = await redis.get('feed_cache');
+            if (cached) return JSON.parse(cached);
 
-    // Implementação real da invalidação
-    static async invalidateCache() {
-        await redis.del(this.CACHE_KEY);
-        console.log('🧹 Cache do Feed limpo.');
+            const feed = await prisma.systemLog.findMany({
+                take: 20,
+                orderBy: { createdAt: 'desc' }
+            });
+
+            await redis.set('feed_cache', JSON.stringify(feed), 'EX', 60);
+            return feed;
+        } catch (error) {
+            console.error("Erro no FeedService:", error);
+            return [];
+        }
     }
 
-    static async getFeed() {
-        // 1. Tenta o Cache
-        const cached = await redis.get(this.CACHE_KEY);
-        if (cached) return JSON.parse(cached);
-
-        // 2. Busca no MongoDB via Prisma
-        // Aqui estou a assumir que tem um modelo 'Post' ou 'Feed' no seu schema
-        const feedData = await prisma.user.findMany({
-            include: {
-                // Ajuste aqui conforme os nomes exatos das relações no seu schema.prisma
-                // posts: true 
-            },
-            take: 20, // Limita às 20 mais recentes
-        });
-
-        // 3. Salva no Redis (expira em 5 min)
-        await redis.setex(this.CACHE_KEY, 300, JSON.stringify(feedData));
-
-        return feedData;
+    static async invalidateCache() {
+        await redis.del('feed_cache');
+        console.log("♻️ Cache do Feed invalidado");
     }
 }
