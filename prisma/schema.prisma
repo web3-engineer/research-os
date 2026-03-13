@@ -55,13 +55,13 @@ model User {
 
 // --- MEMÓRIA DO LOUNGE & SALAS ---
 model UserSpaceData {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String   @unique @db.ObjectId
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String   @unique @db.ObjectId
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   // Base UI
-  layout    Json?    // Armazena janelas abertas e posições
-  settings  Json?    // Armazena tema e preferências
+  layout        Json?    // Armazena janelas abertas e posições
+  settings      Json?    // Armazena tema e preferências
   
   // State Persistence
   layoutState     Json?    
@@ -85,7 +85,7 @@ model UserSpaceData {
   workTitle       String?  
 
   createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt // APENAS UMA VEZ AQUI
+  updatedAt       DateTime @updatedAt 
 }
 
 model SystemSetting {
@@ -95,17 +95,23 @@ model SystemSetting {
   updatedAt DateTime @updatedAt
 }
 
+// --- MODELO POST ATUALIZADO (NEURAL EDITOR) ---
 model Post {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  content   String
-  likes     String[] @default([]) 
-  createdAt DateTime @default(now())
-  room      String   @default("lounge") 
-  user      String   
-  userImage String?  
-  userId    String?  @db.ObjectId
-  author    User?    @relation(fields: [userId], references: [id])
-  comments  Comment[]
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String?
+  subtitle    String?
+  content     String
+  tags        String[] @default([])
+  images      String[] @default([]) // Máximo 5 pelo front
+  attachments Json?    // Links ou Docs
+  likes       String[] @default([]) 
+  createdAt   DateTime @default(now())
+  room        String   @default("cyber") 
+  user        String   
+  userImage   String?  
+  userId      String?  @db.ObjectId
+  author      User?    @relation(fields: [userId], references: [id])
+  comments    Comment[]
 }
 
 model Comment {
@@ -119,21 +125,15 @@ model Comment {
   author    User?    @relation(fields: [userId], references: [id])
 }
 
-// --- MODELO ATUALIZADO PARA I18N ---
 model NewsPost {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  
-  // Campos transformados em Json para suportar os objetos de idioma
-  // Ex: { "pt": "Título", "en": "Title", "zh": "标题", "es": "Título", "fr": "Titre" }
   title       Json
   subtitle    Json?
   content     Json
-  
   imageUrl    String?
   publishDate DateTime @default(now())
   status      String   @default("draft")
   category    String   @default("news") 
-  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

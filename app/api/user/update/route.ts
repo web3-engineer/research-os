@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { prisma } from "@/src/lib/prisma";
-import { authOptions } from "@/src/lib/auth"; // <--- Importando da lib, igual ao outro
+import { authOptions } from "@/src/lib/auth"; // <--- Mantive suas importações originais
 
 export async function POST(req: Request) {
-    // Pergunta pra lib: "Esse cara tá logado?"
+    // 1. Verifica se o usuário está logado
     const session = await getServerSession(authOptions);
 
     if (!session || !session.user?.email) {
@@ -12,28 +12,21 @@ export async function POST(req: Request) {
     }
 
     try {
-        const formData = await req.formData();
-        const name = formData.get("name") as string;
-        const course = formData.get("course") as string;
-        const imageFile = formData.get("image") as File | null;
+        // 2. Agora lemos o JSON enviado pelo Front-End (ProfileModule)
+        const body = await req.json();
+        const { name, course, image, torsoImage } = body;
 
         const dataToUpdate: any = {};
 
+        // 3. Monta o objeto apenas com o que foi alterado
         if (name && name.trim() !== "") dataToUpdate.name = name;
         if (course) dataToUpdate.course = course;
+        
+        // Como o Front-End já converteu as imagens para Base64, é só repassar pro banco!
+        if (image) dataToUpdate.image = image; 
+        if (torsoImage) dataToUpdate.torsoImage = torsoImage; 
 
-        // Processamento da Imagem
-        if (imageFile) {
-            if (imageFile.size > 4 * 1024 * 1024) {
-                return NextResponse.json({ error: "Imagem muito grande (Max 4MB)" }, { status: 400 });
-            }
-            const bytes = await imageFile.arrayBuffer();
-            const buffer = Buffer.from(bytes);
-            const base64Image = `data:${imageFile.type};base64,${buffer.toString('base64')}`;
-            dataToUpdate.image = base64Image;
-        }
-
-        // Salva no Banco (Upsert = Cria se não existir, Atualiza se existir)
+        // 4. Salva no Banco (Upsert = Cria se não existir, Atualiza se existir)
         const updatedUser = await prisma.user.upsert({
             where: {
                 email: session.user.email,
@@ -42,8 +35,9 @@ export async function POST(req: Request) {
             create: {
                 email: session.user.email,
                 name: name || session.user.name,
-                image: dataToUpdate.image || session.user.image,
+                image: image || session.user.image,
                 course: course || "",
+                torsoImage: torsoImage || null, // Novo campo adicionado!
                 kycStatus: "pending"
             },
         });
@@ -55,7 +49,8 @@ export async function POST(req: Request) {
             user: {
                 name: updatedUser.name,
                 image: updatedUser.image,
-                course: updatedUser.course
+                course: updatedUser.course,
+                torsoImage: updatedUser.torsoImage
             }
         });
 

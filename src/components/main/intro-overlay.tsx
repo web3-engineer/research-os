@@ -1,83 +1,209 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
-import HyperText from "src/components/ui/hyper-text";
+import Image, { type StaticImageData } from "next/image";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-export default function IntroOverlay({ onComplete }: { onComplete: () => void }) {
-  const { t } = useTranslation();
-  const [mounted, setMounted] = useState(false);
-  const [phase, setPhase] = useState<"line1" | "line2" | "pause" | "squash" | "loading">("line1");
+// REMOVIDO: import brain from "/assets/zaeon-brain.png"; 
+// ARQUIVOS EM 'PUBLIC' SÃO ACESSADOS POR STRING, NÃO POR IMPORT.
 
-  useEffect(() => {
-    setMounted(true);
-    const t1 = setTimeout(() => setPhase("line2"), 1600);
-    const t2 = setTimeout(() => setPhase("pause"), 3200);
-    const t3 = setTimeout(() => setPhase("squash"), 3900);
-    const t4 = setTimeout(() => setPhase("loading"), 4300);
-    const tEnd = setTimeout(onComplete, 6000);
+type Props = {
+    show?: boolean;
+    onDone?: () => void;
+    minDurationMs?: number;
+    logoSrc?: StaticImageData | string;
+    hint?: string;
+};
 
-    return () => {
-      clearTimeout(t1); clearTimeout(t2); 
-      clearTimeout(t3); clearTimeout(t4); clearTimeout(tEnd);
-    };
-  }, [onComplete]);
+export default function MacSplash({
+    show = true,
+    onDone,
+    minDurationMs = 3000,
+    // Definimos o caminho padrão diretamente como string
+    logoSrc = "/assets/zaeon-brain.png", 
+}: Props) {
+    const [progress, setProgress] = useState(0);
+    const [phase, setPhase] = useState<0 | 1 | 2 | 3 | 4>(0);
+    const [visible, setVisible] = useState(show);
+    const [opacity, setOpacity] = useState(0);
+    const [contentScale, setContentScale] = useState(1);
+    const [contentBlur, setContentBlur] = useState(0);
+    const startedAt = useRef<number | null>(null);
+    const exitingRef = useRef(false);
 
-  // Fundo neutro durante a hidratação
-  if (!mounted) return <div className="fixed inset-0 z-[99999] bg-white dark:bg-[#030014]" />;
+    const prefersReducedMotion = useMemo(
+        () =>
+            typeof window !== "undefined" &&
+            window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
+        []
+    );
 
-  return (
-    <motion.div
-      // DINÂMICO: bg-white por padrão, bg-background no dark mode
-      className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-white dark:bg-[#030014] overflow-hidden font-[family-name:var(--font-outfit)]"
-      exit={{ opacity: 0, transition: { duration: 0.8 } }}
-    >
-      <div className="relative flex flex-col items-center justify-center w-full">
-        <AnimatePresence>
-          {phase !== "loading" && (
-            <motion.div
-              initial={{ opacity: 1, scaleY: 1 }}
-              animate={phase === "squash" ? { 
-                scaleY: 0, 
-                opacity: 0, 
-                filter: "blur(10px)",
-              } : { scaleY: 1, opacity: 1 }}
-              transition={{ duration: 0.4, ease: [0.45, 0, 0.55, 1] }}
-              // DINÂMICO: Texto preto no light, branco no dark
-              className="flex flex-col gap-8 font-semibold leading-tight uppercase text-center text-black dark:text-white"
+    const ease = (t: number) => 1 - Math.pow(1 - t, 3);
+
+    useEffect(() => {
+        if (!show) return;
+
+        setVisible(true);
+        const openT = setTimeout(() => setOpacity(1), 10);
+
+        if (typeof window !== "undefined") {
+            window.history.scrollRestoration = "manual";
+            window.scrollTo(0, 0);
+        }
+
+        let raf = 0;
+        const loop = (ts: number) => {
+            if (!startedAt.current) startedAt.current = ts;
+            const elapsed = ts - startedAt.current;
+            const total = Math.max(1, minDurationMs);
+            const t = Math.min(1, elapsed / total);
+            const eased = prefersReducedMotion ? t : ease(t);
+
+            setProgress(eased);
+
+            if (!exitingRef.current && typeof window !== "undefined") {
+                window.scrollTo(0, 0);
+            }
+
+            if (eased >= 0.9 && phase < 4) setPhase(4);
+            else if (eased >= 0.69 && phase < 3) setPhase(3);
+            else if (eased >= 0.51 && phase < 2) setPhase(2);
+            else if (eased >= 0.33 && phase < 1) setPhase(1);
+
+            if (t < 1) {
+                raf = requestAnimationFrame(loop);
+            } else if (!exitingRef.current) {
+                exitingRef.current = true;
+
+                if (typeof window !== "undefined") window.scrollTo(0, 0);
+
+                if (!prefersReducedMotion) {
+                    setContentScale(0.985);
+                    setContentBlur(4);
+                }
+                setOpacity(0);
+                setTimeout(() => {
+                    onDone?.();
+                    setVisible(false);
+                    startedAt.current = null;
+                    exitingRef.current = false;
+                    setProgress(0);
+                    setPhase(0);
+                    setContentScale(1);
+                    setContentBlur(0);
+                }, prefersReducedMotion ? 0 : 260);
+            }
+        };
+
+        raf = requestAnimationFrame(loop);
+        return () => {
+            clearTimeout(openT);
+            cancelAnimationFrame(raf);
+        };
+    }, [show, minDurationMs, prefersReducedMotion, phase, onDone]);
+
+    useEffect(() => {
+        if (!show && visible && !exitingRef.current) {
+            exitingRef.current = true;
+            if (!prefersReducedMotion) {
+                setContentScale(0.985);
+                setContentBlur(4);
+            }
+            setOpacity(0);
+            const t = setTimeout(() => {
+                onDone?.();
+                setVisible(false);
+                exitingRef.current = false;
+            }, prefersReducedMotion ? 0 : 220);
+            return () => clearTimeout(t);
+        }
+    }, [show, visible, prefersReducedMotion, onDone]);
+
+    if (!visible) return null;
+
+    const zhPhrase =
+        phase >= 4 || phase === 3
+            ? "世界之希望已诞生"
+            : phase === 2
+                ? "日月星辰皆为吾家"
+                : phase === 1
+                    ? "万物归一"
+                    : "";
+
+    return (
+        <div
+            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black transition-opacity duration-300"
+            style={{ opacity }}
+            role="status"
+            aria-label="Carregando"
+        >
+            <div
+                className="flex flex-col items-center justify-center px-6 transition-[transform,filter] duration-300"
+                style={{
+                    transform: `scale(${contentScale})`,
+                    filter: contentBlur ? `blur(${contentBlur}px)` : "none",
+                }}
             >
-              <div style={{ fontSize: "clamp(1.2rem, 4vw, 2.5rem)" }}>
-                <HyperText text={t("intro.line1", "STUDY, LEARN, RESEARCH")} />
-              </div>
-              
-              {(phase === "line2" || phase === "pause" || phase === "squash") && (
-                <div style={{ fontSize: "clamp(1.2rem, 4vw, 2.5rem)" }}>
-                  <HyperText text={t("intro.line2", "PUBLISH / MONETIZE.")} />
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+                {/* Logo */}
+                <Image
+                    src={logoSrc}
+                    alt="Zaeon"
+                    width={100}
+                    height={100}
+                    priority
+                    className="mb-6 opacity-95"
+                />
 
-        {phase === "loading" && (
-          <motion.div 
-            initial={{ width: "60px", opacity: 0 }}
-            animate={{ width: "240px", opacity: 1 }}
-            transition={{ duration: 0.5, ease: "backOut" }}
-            // DINÂMICO: Trilho da barra se ajusta ao fundo
-            className="h-[3px] bg-gray-200 dark:bg-white/10 rounded-full overflow-hidden relative"
-          >
-            <motion.div 
-              initial={{ width: "0%" }}
-              animate={{ width: "100%" }}
-              transition={{ duration: 1.5, ease: "easeInOut" }}
-              // DINÂMICO: Barra preta no light, branca no dark
-              className="h-full bg-black dark:bg-white rounded-full"
-            />
-          </motion.div>
-        )}
-      </div>
-    </motion.div>
-  );
+                {/* Barra de progresso */}
+                <div className="w-[200px] h-[3px] rounded-full bg-white/15 overflow-hidden">
+                    <div
+                        className="h-full rounded-full"
+                        style={{
+                            width: `${Math.max(0.02, progress) * 100}%`,
+                            transition: prefersReducedMotion
+                                ? "none"
+                                : "width 120ms cubic-bezier(.22,.61,.36,1)",
+                            background:
+                                "linear-gradient(90deg,rgba(255,255,255,.9),rgba(230,236,255,.95),rgba(255,255,255,.9))",
+                            boxShadow: "0 0 8px rgba(255,255,255,0.35)",
+                            transform: "translateZ(0)",
+                            willChange: "width",
+                        }}
+                    />
+                </div>
+
+                {/* Frase Mística */}
+                {zhPhrase && (
+                    <div
+                        className="mt-8 text-center text-[8px] tracking-[0.4em] leading-none text-sky-400/60 font-thin uppercase"
+                        style={{
+                            fontFamily: `"PingFang SC", "Noto Sans SC", "Helvetica Neue", sans-serif`,
+                            WebkitFontSmoothing: "antialiased",
+                        }}
+                        aria-hidden="true"
+                    >
+                        {zhPhrase}
+                    </div>
+                )}
+
+                {/* Logs técnicos */}
+                <div
+                    className="mt-4 text-center text-[9px] leading-tight text-white/60"
+                    style={{
+                        fontFamily:
+                            `"Ubuntu Mono","SF Mono","Menlo","Consolas","Liberation Mono",monospace`,
+                    }}
+                    aria-live="polite"
+                >
+                    {phase >= 1 && <p>[ OK ] mounting zaeon kernel modules — 33%</p>}
+                    {phase >= 2 && <p>[ OK ] linking research graph services — 51%</p>}
+                    {phase >= 3 && <p>[ OK ] starting ai-mentors daemons — 69%</p>}
+                    {phase >= 4 && (
+                        <p className="pt-1 text-white/75 tracking-wide">
+                            zaeon state initiated.
+                        </p>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
 }

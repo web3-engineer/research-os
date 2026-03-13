@@ -240,41 +240,42 @@ export default function HomeworkPage() {
     // --- SPECIALIZED ACTIONS ---
     const handleGenerateCitations = async () => {
         if (!activeFileContext) { alert("Please load a PDF document first (drag PDF -> click Play)."); return; }
-        addLog("✨ Scholar Agent: Extracting Citations (ABNT & APA)...");
+        addLog("✨ Scholar Agent: Extracting ABNT Citations...");
         
+        // MODIFICAÇÃO: Ajuste rigoroso para formato ABNT sem incluir a APA.
         const citationPrompt = `
-            Extract 3 significant verbatim excerpts (entire paragraphs) from the document that are crucial for research.
-            For each excerpt, provide the reference strictly in **ABNT (Brazilian)** and **APA (American)** styles.
+            Com base no documento fornecido em contexto, extraia 3 trechos verbatim (parágrafos inteiros) que sejam extremamente cruciais e relevantes para fundamentar uma pesquisa acadêmica.
+            Para cada trecho extraído, gere a referência bibliográfica correspondente estritamente nas regras da **ABNT (Associação Brasileira de Normas Técnicas)**.
             
-            Output format:
-            1. "Excerpt text..."
-            - ABNT: Reference ABNT
-            - APA: Reference APA
+            Formato de saída esperado para cada item:
+            1. "Texto exato do trecho extraído do documento..."
+            - Referência ABNT: SOBRENOME, Nome. Título do artigo/livro. Local, Ano.
         `;
 
         const result = await handleAgentAction('scholar', citationPrompt, true);
         setCitationContent(result);
-        addLog("✅ Citations generated successfully.");
+        addLog("✅ Citações ABNT geradas com sucesso.");
     };
 
     const handleSaveCitation = async () => {
         if(!citationContent) return;
         setIsSystemProcessing(true);
-        addLog("💾 Saving Citations to Knowledge Graph...");
+        addLog("💾 Salvando Citações na Base de Dados (UserSpaceData)...");
         try {
-            const response = await fetch('/api/citations/save', {
+            // MODIFICAÇÃO: Integrando a persistência com o modelo UserSpaceData via rota /api/workspace
+            const response = await fetch('/api/workspace', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    citation: citationContent,
-                    userId: session?.user ? (session.user as any).id : "guest_user_123"
+                    userId: session?.user?.email || "anonymous_user",
+                    citations: citationContent // Adicionando as citações ao Payload para atualizar o Json no Prisma
                 })
             });
             if (response.ok) {
-                addLog("✅ Citations Persisted to Database.");
-                alert("Citations saved successfully!");
+                addLog("✅ Citações persistidas no Banco de Dados.");
+                alert("Citações salvas com sucesso!");
             } else { throw new Error("Database Sync Failed"); }
-        } catch (e) { addLog("❌ Error Saving Citations."); console.error(e); } finally { setIsSystemProcessing(false); }
+        } catch (e) { addLog("❌ Erro ao salvar citações."); console.error(e); } finally { setIsSystemProcessing(false); }
     };
 
     const handleSpecialistQuery = async (specialistType: 'scribe' | 'examiner', inputVal: string) => {
@@ -284,7 +285,6 @@ export default function HomeworkPage() {
             [specialistType]: [...prev[specialistType], { role: 'user', text: inputVal }]
         }));
         
-        // Passa o PDF context apenas para o Examiner (para criar as provas)
         const usePdf = specialistType === 'examiner';
         const result = await handleAgentAction(specialistType, inputVal, usePdf);
         
@@ -335,6 +335,11 @@ export default function HomeworkPage() {
                     : null;
             } else {
                 fileData = activeFileContext;
+                
+                // MODIFICAÇÃO: Concatena o histórico de conversa (memória contínua) ao systemContext
+                // para que o Agente saiba exatamente o que foi perguntado e respondido antes no modo Study.
+                const historyContext = studyChatHistory.map(msg => `${msg.role === 'ai' ? 'Agente' : 'Usuário'}: ${msg.text}`).join('\n');
+                systemContext = `[HISTÓRICO DA CONVERSA PARA CONTEXTO]:\n${historyContext}\nResponda sempre com base no histórico e no documento carregado.`;
             }
 
             const response = await fetch('/api/chat', { 
@@ -343,7 +348,7 @@ export default function HomeworkPage() {
                 body: JSON.stringify({ 
                     prompt: currentPrompt, 
                     agent: targetAgent, 
-                    fileData: fileData,
+                    fileData: fileData, // O PDF em base64 continua sendo enviado para manter a referência forte
                     systemContext 
                 }) 
             });

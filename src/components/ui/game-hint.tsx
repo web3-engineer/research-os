@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { ExclamationTriangleIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { useState, useEffect } from "react";
 
 interface GameHintProps {
@@ -30,8 +30,8 @@ export default function GameHint({ hints, isVisible }: GameHintProps) {
           exit={{ opacity: 0, y: 10, scale: 0.95 }}
           className="mt-4 w-full max-w-[480px] group relative"
         >
-          {/* Background com Vidro e Brilho */}
-          <div className="relative overflow-hidden rounded-xl border border-cyan-500/30 bg-black/40 p-4 backdrop-blur-md shadow-[0_0_20px_rgba(34,211,238,0.1)]">
+          {/* Background ajustado para a cor do menu (Cyan 900/20) */}
+          <div className="relative overflow-hidden rounded-xl border border-cyan-400/30 bg-cyan-900/20 p-4 backdrop-blur-md shadow-[0_0_20px_rgba(34,211,238,0.15)]">
             
             {/* Barra lateral de "Alerta" */}
             <div className="absolute left-0 top-0 h-full w-1 bg-cyan-500 shadow-[0_0_10px_#22d3ee]" />
@@ -42,14 +42,13 @@ export default function GameHint({ hints, isVisible }: GameHintProps) {
               </div>
 
               <div className="flex-1">
-                <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400/80">
-                  System Hint // Tutorial
+                <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400">
                 </h4>
                 <motion.p 
                   key={currentHint}
                   initial={{ opacity: 0, x: 10 }}
                   animate={{ opacity: 1, x: 0 }}
-                  className="mt-1 text-xs leading-relaxed text-white/70"
+                  className="mt-1 text-xs leading-relaxed text-white/90 font-medium"
                 >
                   {hints[currentHint]}
                 </motion.p>

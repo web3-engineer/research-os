@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import type { Request, Response } from "express"; // Adicionado o 'type'
 import { prisma } from "../lib/prisma";
 
 export const syncUserSpace = async (req: Request, res: Response) => {

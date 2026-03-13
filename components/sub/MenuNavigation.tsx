@@ -47,11 +47,13 @@ export default function MenuNavigation() {
     return true;
   });
 
-  const panelClass = "w-full mt-24 rounded-3xl overflow-hidden backdrop-blur-xl transition-all duration-500 bg-black/60 border border-white/10 dark:bg-cyan-900/20 dark:border-cyan-400/30 shadow-2xl flex flex-col";
+  // Ajustado para usar o tom de azul (cyan-900/20) em ambos os modos
+  const panelClass = "w-full mt-24 rounded-3xl overflow-hidden backdrop-blur-xl transition-all duration-500 bg-cyan-900/20 border border-cyan-400/30 shadow-2xl flex flex-col";
   
-  const cardBase = "group relative overflow-hidden flex items-center justify-between rounded-xl px-5 min-h-[64px] w-full transition-all duration-300 cursor-pointer font-bold text-white bg-black/40 hover:bg-black/60 border border-white/5 hover:border-white/20 dark:bg-cyan-950/30 hover:scale-[1.01]";
+  // Ajustado para usar cyan-950/30 (o tom azul escuro e transparente) como base
+  const cardBase = "group relative overflow-hidden flex items-center justify-between rounded-xl px-5 min-h-[64px] w-full transition-all duration-300 cursor-pointer font-bold text-white bg-cyan-950/30 hover:bg-cyan-900/40 border border-white/5 hover:border-cyan-400/20 hover:scale-[1.01]";
   
-  const cardSelected = "ring-1 ring-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.3)] bg-black/50 dark:bg-cyan-900/40";
+  const cardSelected = "ring-1 ring-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.3)] bg-cyan-900/40";
   const accentBar = (active: boolean) => `absolute left-0 top-0 h-full w-[4px] transition-all duration-300 ${active ? "bg-cyan-400 opacity-100" : "bg-transparent opacity-0"}`;
 
   return (
@@ -83,7 +85,6 @@ export default function MenuNavigation() {
                         }} 
                       />
                       
-                      {/* Ao clicar aqui, abre o MODAL */}
                       <span 
                         className="text-[11px] min-w-[110px] text-center uppercase tracking-tighter hover:text-cyan-400 cursor-pointer select-none" 
                         onClick={(e) => {
@@ -106,7 +107,6 @@ export default function MenuNavigation() {
                 </div>
               </li>
 
-              {/* OUTROS ITENS */}
               {visibleMenuItems.slice(1).map((item, i) => {
                 const isSel = index === i + 1;
                 return (
@@ -125,7 +125,6 @@ export default function MenuNavigation() {
               })}
             </motion.ul>
           ) : (
-            // OPÇÕES
             <motion.div 
               key="options" 
               initial={{ x: 20, opacity: 0 }} 
@@ -171,7 +170,6 @@ export default function MenuNavigation() {
       
       <div className="px-6 pb-7 text-[11px] opacity-55 text-white tracking-widest">{t("footer.version")}</div>
       
-      {/* AQUI ESTÁ A CHAMADA PARA O MODAL */}
       {onboardOpen && (
         <OnboardModal 
           isOpen={onboardOpen} 

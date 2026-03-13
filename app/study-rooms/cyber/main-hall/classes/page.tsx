@@ -5,20 +5,155 @@ import {
   MapPin, User, Activity, Clock, ChevronUp, ChevronDown, 
   Power, Send, Sparkles, X, AlertCircle, StickyNote,
   FileText, Plus, Database, Bot, File, Briefcase, Pen, Globe,
-  Users, Layers, Share2, Copy, Link as LinkIcon, ArrowUpRight,
-  Type, Image as ImageIcon, Bold, Italic, Hash, UploadCloud
+  Users, Layers, Share2, Copy, ArrowUpRight,
+  Hash, UploadCloud, Trash2, Check, Brain, Cpu
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 
-// --- INITIAL DATA (EMPTY FOR USER) ---
+// --- INITIAL DATA ---
 const initialSchedule: any[] = []; 
 
-// --- INTERFACES ---
 interface StoredDoc { id: string; title: string; type: 'pdf' | 'doc'; size: string; }
 interface UserItem { id: string; type: 'file' | 'link'; name: string; meta: string; }
 interface UserModule { id: number; title: string; items: UserItem[]; }
+
+// CORES DISPONÍVEIS PARA AS AULAS 
+const CLASS_COLORS = [
+    "from-emerald-400 to-teal-500",
+    "from-blue-400 to-cyan-500",
+    "from-indigo-400 to-purple-500",
+    "from-fuchsia-400 to-pink-500",
+    "from-rose-400 to-red-500",
+    "from-amber-400 to-orange-500"
+];
+
+// --- COMPONENT: REAL-TIME TRACKER ---
+const RealTimeModule = ({ classes, pluggedDay, gadgetOn, dragConstraints, session }: any) => {
+    const [currentTime, setCurrentTime] = useState(new Date());
+    const awardedXPClasses = useRef<Set<string>>(new Set()); 
+
+    useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(new Date()), 60000); 
+        return () => clearInterval(timer);
+    }, []);
+
+    const isActive = gadgetOn && pluggedDay !== null;
+    const currentHour = currentTime.getHours();
+    const currentRealDayIdx = (currentTime.getDay() + 6) % 7; 
+    const isPluggedOnToday = pluggedDay === currentRealDayIdx;
+
+    const activeClassNow = useMemo(() => {
+        if (!isActive || !isPluggedOnToday) return null;
+        return classes.find((c: any) => 
+            !c.isDraft && 
+            c.days.includes(pluggedDay + 1) && 
+            currentHour >= c.hour && 
+            currentHour < c.endHour
+        );
+    }, [classes, isActive, isPluggedOnToday, currentHour, pluggedDay]);
+
+    let progress = 0;
+    let earnedXP = 0;
+    let totalXP = 0;
+
+    if (activeClassNow) {
+        const totalMinutes = (activeClassNow.endHour - activeClassNow.hour) * 60;
+        const minutesPassed = (currentHour - activeClassNow.hour) * 60 + currentTime.getMinutes();
+        progress = Math.min(100, Math.max(0, (minutesPassed / totalMinutes) * 100));
+        
+        totalXP = (activeClassNow.endHour - activeClassNow.hour) * 1;
+        earnedXP = Math.floor((progress / 100) * totalXP);
+    }
+
+    useEffect(() => {
+        if (activeClassNow && progress >= 100 && session?.user?.email) {
+            const classKey = `${activeClassNow.id}-${currentTime.toDateString()}`; 
+            
+            if (!awardedXPClasses.current.has(classKey)) {
+                awardedXPClasses.current.add(classKey);
+                
+                fetch('/api/user/xp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ xpToAdd: totalXP })
+                }).catch(err => console.error("Falha ao registrar XP:", err));
+            }
+        }
+    }, [progress, activeClassNow, session, totalXP, currentTime]);
+
+    if (!isActive) {
+        return (
+            <motion.div drag dragConstraints={dragConstraints} className="group w-80 h-[380px] relative z-10" onClick={(e) => e.stopPropagation()}>
+                <div className="w-full h-full bg-[#0a0a0a]/90 backdrop-blur-2xl border border-white/10 p-5 rounded-[2.5rem] shadow-xl flex flex-col items-center justify-center relative overflow-hidden">
+                    <Sparkles size={24} className="text-white/20 mb-2" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-white/30 text-center">Real-Time Tracker Offline<br/>Plug gadget into current day</span>
+                </div>
+            </motion.div>
+        );
+    }
+
+    if (!activeClassNow) {
+        return (
+            <motion.div drag dragConstraints={dragConstraints} className="group w-80 h-[380px] relative z-10" onClick={(e) => e.stopPropagation()}>
+                <div className="w-full h-full bg-[#0a0a0a]/90 backdrop-blur-2xl border border-cyan-500/30 shadow-[0_0_20px_rgba(34,211,238,0.1)] p-5 rounded-[2.5rem] flex flex-col items-center justify-center relative overflow-hidden">
+                    <div className="absolute top-5 left-5 flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-ping" />
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-cyan-400">Monitoring Active</span>
+                    </div>
+                    <Clock size={24} className="text-cyan-400/50 mb-2" />
+                    <span className="text-[12px] font-bold uppercase tracking-widest text-white/70 text-center">No Active Session<br/>at this hour</span>
+                </div>
+            </motion.div>
+        );
+    }
+
+    return (
+        <motion.div drag dragConstraints={dragConstraints} className="group w-80 h-[380px] relative z-10" onClick={(e) => e.stopPropagation()}>
+            <div className="w-full h-full bg-[#0a0a0a]/90 backdrop-blur-2xl border border-cyan-500/50 shadow-[0_0_30px_rgba(34,211,238,0.15)] p-6 rounded-[2.5rem] flex flex-col justify-between relative overflow-hidden">
+                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                    <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-cyan-400 rounded-full shadow-[0_0_8px_#22d3ee] animate-pulse" />
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-cyan-400">Session Live</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-white/50">{currentTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                </div>
+
+                <div className="flex flex-col items-center justify-center flex-1 py-4">
+                    <span className="text-[10px] text-white/50 uppercase tracking-widest mb-1">You are currently in</span>
+                    <h2 className="text-xl font-black text-white text-center leading-tight mb-4 drop-shadow-md">{activeClassNow.name}</h2>
+                    
+                    <div className="w-full flex items-center justify-between text-[10px] font-mono text-white/50 mb-2 px-1">
+                        <span>{activeClassNow.hour}:00</span>
+                        <span>{activeClassNow.endHour}:00</span>
+                    </div>
+                    
+                    <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden border border-white/10 relative">
+                        <motion.div 
+                            className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${progress}%` }}
+                            transition={{ duration: 1 }}
+                        />
+                    </div>
+                    
+                    <div className="w-full flex items-center justify-between mt-6 px-4 py-3 bg-white/5 border border-white/10 rounded-2xl">
+                        <div className="flex flex-col">
+                            <span className="text-[8px] uppercase tracking-widest text-white/40">XP Earned</span>
+                            <span className="text-lg font-black text-yellow-400">+{earnedXP}</span>
+                        </div>
+                        <div className="h-6 w-px bg-white/10" />
+                        <div className="flex flex-col text-right">
+                            <span className="text-[8px] uppercase tracking-widest text-white/40">Total Bounty</span>
+                            <span className="text-lg font-black text-white/80">{totalXP}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </motion.div>
+    );
+};
 
 // --- COMPONENT: COLLECTIVE BUILD NODE ---
 const CollectiveZone = ({ classes, currentUser, dragConstraints }: { classes: any[], currentUser: any, dragConstraints: any }) => {
@@ -31,14 +166,19 @@ const CollectiveZone = ({ classes, currentUser, dragConstraints }: { classes: an
         { user: 'System', text: 'Secure channel established.' }
     ]);
 
-    // Update active class if classes change or on init
-    useEffect(() => {
-        if (classes.length > 0 && !activeClassId) {
-            setActiveClassId(classes[0].id);
-        }
-    }, [classes, activeClassId]);
+    const savedClasses = classes.filter(c => !c.isDraft);
 
-    const activeClass = classes.find((c: any) => c.id === activeClassId);
+    useEffect(() => {
+        if (savedClasses.length === 0) {
+            setActiveClassId(null);
+            setInviteCode(null);
+            setMembers([]);
+        } else if (!activeClassId || !savedClasses.some(c => c.id === activeClassId)) {
+            setActiveClassId(savedClasses[0].id);
+        }
+    }, [savedClasses, activeClassId]);
+
+    const activeClass = savedClasses.find((c: any) => c.id === activeClassId);
 
     const generateCode = () => {
         setIsGenerating(true);
@@ -58,7 +198,30 @@ const CollectiveZone = ({ classes, currentUser, dragConstraints }: { classes: an
         setChatMsg("");
     };
 
-    if (classes.length === 0) return null; // Don't show if no classes
+    if (savedClasses.length === 0) {
+        return (
+            <motion.div 
+                drag
+                dragConstraints={dragConstraints}
+                whileHover={{ cursor: "grab" }}
+                whileDrag={{ cursor: "grabbing", zIndex: 100 }}
+                className="w-full mt-10 max-w-[1400px] relative z-30"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="relative w-full bg-white/70 dark:bg-black/30 backdrop-blur-3xl border border-slate-300 dark:border-white/10 rounded-[2.5rem] p-8 shadow-2xl flex flex-col items-center justify-center min-h-[300px] gap-4 overflow-hidden">
+                    <div className="p-4 bg-indigo-500/10 rounded-full border border-indigo-500/20 text-indigo-500 mb-2">
+                        <Users size={32} />
+                    </div>
+                    <div className="text-center flex flex-col items-center">
+                        <h3 className="text-sm font-black uppercase tracking-[0.2em] text-slate-800 dark:text-white mb-3">Collective Build Node</h3>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest border border-dashed border-slate-300 dark:border-white/20 p-4 rounded-xl backdrop-blur-sm max-w-sm">
+                            Module in standby.<br/>Save a class in your agenda to open a secure channel.
+                        </p>
+                    </div>
+                </div>
+            </motion.div>
+        );
+    }
 
     return (
         <motion.div 
@@ -67,8 +230,9 @@ const CollectiveZone = ({ classes, currentUser, dragConstraints }: { classes: an
             whileHover={{ cursor: "grab" }}
             whileDrag={{ cursor: "grabbing", zIndex: 100 }}
             className="w-full mt-10 max-w-[1400px] relative z-30"
+            onClick={(e) => e.stopPropagation()}
         >
-            <div className="relative w-full bg-white/70 dark:bg-black/30 backdrop-blur-3xl border border-slate-300 dark:border-white/10 rounded-[2.5rem] p-8 shadow-2xl flex flex-col gap-6 overflow-hidden">
+            <div className="relative w-full bg-white/70 dark:bg-black/30 backdrop-blur-3xl border border-slate-300 dark:border-white/10 rounded-[2.5rem] p-8 shadow-xl dark:shadow-2xl flex flex-col gap-6 overflow-hidden">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-300/50 dark:border-white/10 pb-6">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-indigo-500/10 rounded-xl border border-indigo-500/20 text-indigo-500">
@@ -80,15 +244,22 @@ const CollectiveZone = ({ classes, currentUser, dragConstraints }: { classes: an
                         </div>
                     </div>
                     <div className="flex gap-2 overflow-x-auto scrollbar-hide max-w-full pb-1">
-                        {classes.map((cls: any) => (
+                        {savedClasses.map((cls: any) => (
                             <button
                                 key={cls.id}
-                                onPointerDown={(e) => e.stopPropagation()}
-                                onClick={() => { setActiveClassId(cls.id); setInviteCode(null); setMembers([]); }}
+                                onClick={(e) => { 
+                                    e.stopPropagation();
+                                    if(activeClassId !== cls.id) {
+                                        setActiveClassId(cls.id); 
+                                        setInviteCode(null); 
+                                        setMembers([]); 
+                                        setGroupMessages([{ user: 'System', text: `Secure channel for ${cls.name} established.` }]);
+                                    }
+                                }}
                                 className={`px-4 py-2 rounded-full text-[9px] font-bold uppercase tracking-wider transition-all whitespace-nowrap border
                                     ${activeClassId === cls.id 
                                         ? `bg-slate-800 text-white border-slate-900 dark:bg-white dark:text-black shadow-lg` 
-                                        : 'bg-white/50 dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10 hover:bg-white dark:hover:bg-white/10'
+                                        : 'bg-white/50 dark:bg-white/5 text-slate-500 border-slate-300 dark:border-white/10 hover:bg-white dark:hover:bg-white/10 shadow-sm dark:shadow-none'
                                     }`}
                             >
                                 {cls.name}
@@ -98,10 +269,10 @@ const CollectiveZone = ({ classes, currentUser, dragConstraints }: { classes: an
                 </div>
 
                 <div className="flex flex-col lg:flex-row gap-8 h-[500px]">
-                    <div className="flex-1 flex flex-col bg-slate-50/50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-[2rem] p-1 relative overflow-hidden" onPointerDown={(e) => e.stopPropagation()}>
-                        <div className="px-6 py-4 flex items-center justify-between border-b border-slate-200/50 dark:border-white/5 bg-white/40 dark:bg-black/20">
+                    <div className="flex-1 flex flex-col bg-white/80 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-[2rem] p-1 relative overflow-hidden shadow-md dark:shadow-none" onClick={(e) => e.stopPropagation()}>
+                        <div className="px-6 py-4 flex items-center justify-between border-b border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-black/20">
                             <div className="flex items-center gap-2">
-                                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_5px_#22c55e]"></span>
                                 <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase">{activeClass?.name} Channel</span>
                             </div>
                             <Users size={14} className="text-slate-400" />
@@ -110,50 +281,47 @@ const CollectiveZone = ({ classes, currentUser, dragConstraints }: { classes: an
                             {groupMessages.map((msg, i) => (
                                 <div key={i} className={`flex flex-col ${msg.user === (currentUser?.name || 'You') ? 'items-end' : 'items-start'}`}>
                                     <span className="text-[8px] text-slate-400 mb-1 ml-1">{msg.user}</span>
-                                    <div className={`max-w-[80%] px-4 py-2 rounded-2xl text-[11px] font-medium leading-relaxed ${msg.user === (currentUser?.name || 'You') ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white dark:bg-white/10 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-white/5 rounded-tl-none'}`}>
+                                    <div className={`max-w-[80%] px-4 py-2 rounded-2xl text-[11px] font-medium leading-relaxed shadow-sm ${msg.user === (currentUser?.name || 'You') ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white dark:bg-white/10 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-white/5 rounded-tl-none'}`}>
                                         {msg.text}
                                     </div>
                                 </div>
                             ))}
                         </div>
-                        <div className="p-3 bg-white/60 dark:bg-black/20 border-t border-slate-200 dark:border-white/5">
-                            <div className="flex items-center gap-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-full px-2 py-2">
+                        <div className="p-3 bg-slate-50 dark:bg-black/20 border-t border-slate-200 dark:border-white/5">
+                            <div className="flex items-center gap-2 bg-white dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-full px-2 py-2 shadow-inner dark:shadow-none">
                                 <input value={chatMsg} onChange={(e) => setChatMsg(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendGroupMessage()} placeholder={`Message ${activeClass?.name} group...`} className="flex-1 bg-transparent px-4 text-xs font-medium text-slate-800 dark:text-white placeholder:text-slate-400 outline-none" />
                                 <button onClick={sendGroupMessage} className="w-8 h-8 bg-slate-800 dark:bg-white text-white dark:text-black rounded-full flex items-center justify-center hover:scale-105 transition-transform"><ArrowUpRight size={14} /></button>
                             </div>
                         </div>
                     </div>
+                    
                     <div className="w-full lg:w-80 flex flex-col gap-4">
-                        <div className="bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-[2rem] p-6 text-center relative overflow-hidden group" onPointerDown={(e) => e.stopPropagation()}>
+                        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-500/10 dark:to-purple-500/10 border border-indigo-200 dark:border-indigo-500/20 rounded-[2rem] p-4 text-center relative overflow-hidden group shadow-md dark:shadow-none" onClick={(e) => e.stopPropagation()}>
                             {!inviteCode ? (
-                                <div className="flex flex-col items-center gap-3 relative z-10">
-                                    <div className="w-12 h-12 bg-white dark:bg-white/10 rounded-full flex items-center justify-center shadow-lg mb-1"><Share2 size={20} className="text-indigo-500" /></div>
-                                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-700 dark:text-white">Build Together</h4>
-                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight px-4">Create a secure link to invite peers to this module.</p>
-                                    <button onClick={generateCode} disabled={isGenerating} className="mt-2 px-6 py-2 bg-slate-900 dark:bg-white text-white dark:text-black rounded-full text-[10px] font-bold uppercase tracking-wider hover:scale-105 transition-transform w-full">{isGenerating ? "Generating..." : "Generate Invite Code"}</button>
+                                <div className="flex flex-col items-center gap-2 relative z-10">
+                                    <div className="w-10 h-10 bg-white dark:bg-white/10 rounded-full flex items-center justify-center shadow-lg mb-1 border border-indigo-100 dark:border-none"><Share2 size={16} className="text-indigo-500" /></div>
+                                    <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-700 dark:text-white">Build Together</h4>
+                                    <button onClick={generateCode} disabled={isGenerating} className="mt-1 px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-black rounded-full text-[9px] font-bold uppercase tracking-wider hover:scale-105 transition-transform w-full shadow-lg">{isGenerating ? "Generating..." : "Generate Code"}</button>
                                 </div>
                             ) : (
-                                <div className="flex flex-col items-center gap-3 relative z-10">
-                                    <div className="w-full bg-white/50 dark:bg-black/30 border border-dashed border-indigo-400/50 rounded-xl p-4 flex flex-col items-center"><span className="text-[9px] font-bold text-indigo-500 uppercase mb-1">Access Code</span><span className="text-2xl font-black font-mono text-slate-800 dark:text-white tracking-widest select-all">{inviteCode}</span></div>
-                                    <div className="flex items-center gap-2 text-emerald-500 text-[10px] font-bold bg-emerald-500/10 px-3 py-1 rounded-full"><div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />Session Active</div>
-                                    <button onClick={() => { navigator.clipboard.writeText(`zaeon.io/join/${inviteCode}`); }} className="flex items-center gap-2 text-[10px] font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors"><Copy size={12} /> Copy Link</button>
+                                <div className="flex flex-col items-center gap-2 relative z-10">
+                                    <div className="w-full bg-white/80 dark:bg-white/50 dark:bg-black/30 border border-dashed border-indigo-400/50 rounded-xl p-2 flex flex-col items-center"><span className="text-[8px] font-bold text-indigo-500 uppercase mb-1">Access Code</span><span className="text-xl font-black font-mono text-slate-800 dark:text-white tracking-widest select-all">{inviteCode}</span></div>
+                                    <button onClick={() => { navigator.clipboard.writeText(`zaeon.io/join/${inviteCode}`); }} className="flex items-center gap-2 text-[9px] font-bold text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"><Copy size={10} /> Copy Link</button>
                                 </div>
                             )}
-                            <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/20 rounded-full blur-[40px] group-hover:bg-indigo-500/30 transition-all duration-700" />
                         </div>
-                        <div className="flex-1 bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-[2rem] p-4 flex flex-col gap-3 relative overflow-y-auto custom-scrollbar" onPointerDown={(e) => e.stopPropagation()}>
-                            <div className="flex items-center justify-between pl-2"><span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Active Nodes</span><span className="text-[9px] font-mono text-slate-400">{members.length} Online</span></div>
-                            <div className="grid grid-cols-2 gap-3 flex-1 content-start">
+                        <div className="flex-1 bg-white/80 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-[2rem] p-4 flex flex-col gap-3 relative overflow-y-auto custom-scrollbar shadow-md dark:shadow-none" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-between pl-2"><span className="text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Active Nodes</span><span className="text-[9px] font-mono text-slate-500 dark:text-slate-400">{members.length} Online</span></div>
+                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 flex-1 content-start">
                                 {members.length === 0 ? (
-                                    <div className="col-span-2 flex flex-col items-center justify-center opacity-40 h-full min-h-[100px]"><Users size={24} className="text-slate-400 mb-2" /><span className="text-[8px] font-bold uppercase tracking-wider text-slate-500">Waiting for peers...</span></div>
+                                    <div className="col-span-full flex flex-col items-center justify-center opacity-60 h-full min-h-[100px]"><Users size={24} className="text-slate-400 mb-2" /><span className="text-[8px] font-bold uppercase tracking-wider text-slate-500">Waiting for peers...</span></div>
                                 ) : (
                                     members.map((member, i) => (
-                                        <div key={i} className="aspect-square rounded-2xl border border-slate-300/50 dark:border-white/10 bg-white/30 dark:bg-black/20 flex flex-col items-center justify-center relative overflow-hidden group/slot shadow-sm">
-                                            <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex flex-col items-center gap-2 z-10 w-full">
-                                                <div className="w-12 h-12 rounded-full border-2 border-indigo-500 p-0.5 bg-white/10 backdrop-blur-md shadow-lg"><div className="w-full h-full rounded-full overflow-hidden bg-slate-800 flex items-center justify-center">{member.image ? <Image src={member.image} alt="" fill className="object-cover" /> : <User size={20} className="text-white" />}</div></div>
-                                                <div className="text-center w-full px-2"><span className="text-[9px] font-bold text-slate-800 dark:text-white truncate block">{member.name}</span><span className="text-[7px] font-bold text-indigo-500 bg-indigo-500/10 px-1.5 py-0.5 rounded-full inline-block mt-0.5">CONNECTED</span></div>
+                                        <div key={i} className="aspect-square rounded-2xl border border-slate-200 dark:border-slate-300/50 dark:border-white/10 bg-slate-50 dark:bg-white/30 dark:bg-black/20 flex flex-col items-center justify-center relative overflow-hidden group/slot shadow-sm">
+                                            <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex flex-col items-center gap-1 z-10 w-full">
+                                                <div className="w-10 h-10 rounded-full border-2 border-indigo-400 dark:border-indigo-500 p-0.5 bg-white/50 dark:bg-white/10 backdrop-blur-md shadow-sm dark:shadow-lg"><div className="w-full h-full rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800 flex items-center justify-center">{member.image ? <Image src={member.image} alt="" fill className="object-cover" /> : <User size={16} className="text-slate-500 dark:text-white" />}</div></div>
+                                                <div className="text-center w-full px-1"><span className="text-[8px] font-bold text-slate-800 dark:text-white truncate block">{member.name}</span><span className="text-[6px] font-bold text-indigo-600 dark:text-indigo-500 bg-indigo-100 dark:bg-indigo-500/10 px-1 py-0.5 rounded-full inline-block mt-0.5 border border-indigo-200 dark:border-none">CONNECTED</span></div>
                                             </motion.div>
-                                            <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/10 to-white/0 opacity-0 group-hover/slot:opacity-100 transition-opacity pointer-events-none" />
                                         </div>
                                     ))
                                 )}
@@ -166,68 +334,112 @@ const CollectiveZone = ({ classes, currentUser, dragConstraints }: { classes: an
     );
 };
 
-// --- COMPONENT: COLLAB EDITOR ---
+// --- COMPONENT: NEURAL EDITOR ---
 const CollabEditor = ({ dragConstraints }: { dragConstraints: any }) => {
+    const { data: session } = useSession();
+    
+    const [title, setTitle] = useState("");
+    const [subtitle, setSubtitle] = useState("");
+    const [tagsInput, setTagsInput] = useState("");
+    const [content, setContent] = useState("");
+    const [isPublishing, setIsPublishing] = useState(false);
+
+    const handlePublish = async () => {
+        if (!session?.user) {
+            alert("Operative access required. Please login.");
+            return;
+        }
+
+        if (!title.trim() || !content.trim()) {
+            alert("Title and content are required to publish.");
+            return;
+        }
+        setIsPublishing(true);
+        const tagsArray = tagsInput.split(',').map(t => t.trim().replace('#', '')).filter(Boolean);
+
+        try {
+            const res = await fetch('/api/cyber', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title, subtitle, content, tags: tagsArray,
+                    user: session?.user?.name || "Operative",
+                    userImage: session?.user?.image || "",
+                    userId: (session?.user as any)?.id || null
+                })
+            });
+            if (res.ok) {
+                setTitle(""); setSubtitle(""); setTagsInput(""); setContent("");
+            }
+        } catch (error) {
+            console.error("Error publishing:", error);
+        } finally {
+            setIsPublishing(false);
+        }
+    };
+
     return (
-        <div className="w-full max-w-[1400px] flex flex-col items-center mb-20 relative z-30">
-            <div className="h-16 w-full flex justify-center relative">
-                <svg width="20" height="100%" viewBox="0 0 20 64" className="overflow-visible">
-                    <line x1="10" y1="0" x2="10" y2="64" stroke="#6366f1" strokeWidth="2" className="opacity-30" />
-                    <motion.line x1="10" y1="0" x2="10" y2="64" stroke="#818cf8" strokeWidth="3" strokeDasharray="10 20" initial={{ strokeDashoffset: 0 }} animate={{ strokeDashoffset: 100 }} transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }} className="opacity-80 drop-shadow-[0_0_8px_#6366f1]" />
-                    <circle cx="10" cy="0" r="4" fill="#6366f1" className="animate-pulse" />
-                    <circle cx="10" cy="64" r="4" fill="#6366f1" className="animate-pulse" />
-                </svg>
-            </div>
-            <motion.div drag dragConstraints={dragConstraints} whileHover={{ cursor: "grab" }} whileDrag={{ cursor: "grabbing", zIndex: 100 }} className="relative w-full bg-white/70 dark:bg-black/30 backdrop-blur-3xl border border-slate-300 dark:border-white/10 rounded-[2.5rem] p-8 shadow-2xl flex flex-col gap-6 overflow-hidden">
+        <div className="w-full max-w-[1400px] flex flex-col items-center mb-20 relative z-30">            
+            <motion.div drag dragConstraints={dragConstraints} whileHover={{ cursor: "grab" }} whileDrag={{ cursor: "grabbing", zIndex: 100 }} className="relative w-full bg-white/80 dark:bg-black/30 backdrop-blur-3xl border border-slate-300 dark:border-white/10 rounded-[2.5rem] p-8 shadow-xl dark:shadow-2xl flex flex-col gap-6 overflow-hidden" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-between border-b border-slate-300/50 dark:border-white/10 pb-4">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-indigo-500/10 rounded-xl border border-indigo-500/20 text-indigo-500"><Pen size={20} /></div>
+                        <div className="p-2 bg-indigo-500/10 rounded-xl border border-indigo-500/20 text-indigo-600 dark:text-indigo-500"><Pen size={20} /></div>
                         <div><h3 className="text-sm font-black uppercase tracking-[0.2em] text-slate-800 dark:text-white">Neural Editor</h3><p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">Drafting research papers & blogs</p></div>
                     </div>
-                    <div className="flex items-center gap-2 bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-full px-2 py-1">
-                        <button className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full text-slate-600 dark:text-slate-300 transition-colors"><Type size={14} /></button>
-                        <button className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full text-slate-600 dark:text-slate-300 transition-colors"><Bold size={14} /></button>
-                        <button className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full text-slate-600 dark:text-slate-300 transition-colors"><Italic size={14} /></button>
-                        <div className="w-px h-4 bg-slate-300 dark:bg-white/20 mx-1"></div>
-                        <button className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full text-slate-600 dark:text-slate-300 transition-colors"><ImageIcon size={14} /></button>
-                        <button className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full text-slate-600 dark:text-slate-300 transition-colors"><LinkIcon size={14} /></button>
+                </div>
+                <div className="flex flex-col gap-4">
+                    <input 
+                        type="text" 
+                        value={title} onChange={(e) => setTitle(e.target.value)}
+                        placeholder="Untitled Article..." 
+                        className="text-3xl font-black bg-transparent border-none outline-none text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/20"
+                    />
+                    <input 
+                        type="text" 
+                        value={subtitle} onChange={(e) => setSubtitle(e.target.value)}
+                        placeholder="Add a subtitle or brief description..." 
+                        className="text-sm font-medium bg-transparent border-none outline-none text-slate-600 dark:text-slate-400 placeholder:text-slate-400 dark:placeholder:text-white/10"
+                    />
+                    <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-500 text-xs font-bold">
+                        <Hash size={12} />
+                        <input 
+                            type="text" 
+                            value={tagsInput} onChange={(e) => setTagsInput(e.target.value)}
+                            placeholder="Add tags (e.g., Zaeon, Research)" 
+                            className="bg-transparent outline-none w-full text-indigo-600 dark:text-indigo-500 placeholder:text-indigo-400/60 dark:placeholder:text-indigo-500/40" 
+                        />
                     </div>
-                </div>
-                <div className="flex flex-col gap-4" onPointerDown={(e) => e.stopPropagation()}>
-                    <input type="text" placeholder="Untitled Article..." className="text-3xl font-black bg-transparent border-none outline-none text-slate-800 dark:text-white placeholder:text-slate-300 dark:placeholder:text-white/20"/>
-                    <input type="text" placeholder="Add a subtitle or brief description..." className="text-sm font-medium bg-transparent border-none outline-none text-slate-500 dark:text-slate-400 placeholder:text-slate-300 dark:placeholder:text-white/10"/>
-                    <div className="flex items-center gap-2 text-indigo-500 text-xs font-bold"><Hash size={12} /><input type="text" placeholder="Add tags (e.g., #Zaeon #Research)" className="bg-transparent outline-none w-full text-indigo-500 placeholder:text-indigo-500/40" /></div>
                     <div className="w-full h-px bg-slate-200 dark:bg-white/5 my-2"></div>
-                    <textarea className="w-full h-64 bg-transparent border-none outline-none resize-none text-sm leading-relaxed text-slate-700 dark:text-slate-200 placeholder:text-slate-300 dark:placeholder:text-white/10 custom-scrollbar" placeholder="Start typing your research content here..."/>
-                    <div className="w-full h-24 border-2 border-dashed border-slate-300 dark:border-white/10 rounded-2xl flex flex-col items-center justify-center gap-2 text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors cursor-pointer group"><div className="p-2 bg-slate-100 dark:bg-white/5 rounded-full group-hover:scale-110 transition-transform"><UploadCloud size={18} /></div><span className="text-[10px] font-bold uppercase tracking-wider">Drop images or files to attach</span></div>
+                    <textarea 
+                        value={content} onChange={(e) => setContent(e.target.value)}
+                        className="w-full h-64 bg-transparent border-none outline-none resize-none text-sm leading-relaxed text-slate-700 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-white/10 custom-scrollbar" 
+                        placeholder="Start typing your research content here..."
+                    />
                 </div>
-                <div className="flex justify-end pt-4 border-t border-slate-300/50 dark:border-white/10"><button className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full text-[10px] font-bold uppercase tracking-wider shadow-lg hover:shadow-indigo-500/30 transition-all"><Send size={12} /> Publish to Feed</button></div>
+                <div className="flex justify-end pt-4 border-t border-slate-300/50 dark:border-white/10">
+                    <button onClick={handlePublish} disabled={isPublishing} className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 dark:hover:bg-indigo-500 text-white rounded-full text-[10px] font-bold uppercase tracking-wider shadow-lg hover:shadow-indigo-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        <Send size={12} /> Publish to Feed
+                    </button>
+                </div>
             </motion.div>
         </div>
     );
-}
+};
 
 export default function LessonsModule() {
     const { data: session } = useSession();
     const [isDataLoaded, setIsDataLoaded] = useState(false);
-    const [showYearBoard, setShowYearBoard] = useState(true);
-
-    // STATE - Agenda começa vazia
+    
+    // STATE - Agenda e Módulos
     const [classes, setClasses] = useState<any[]>(initialSchedule);
-    const [selectedClass, setSelectedClass] = useState<any>(null); // Null shows Empty State
+    const [selectedClass, setSelectedClass] = useState<any>(null);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); 
+    
     const [gadgetOn, setGadgetOn] = useState(false);
     const [pluggedDay, setPluggedDay] = useState<number | null>(null);
     const [showSticky, setShowSticky] = useState(true);
     const [stickyText, setStickyText] = useState("");
 
-    // CHAT ASSISTANT (AGENDA)
-    const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'ai', text: string }[]>([
-        { role: 'ai', text: "System online. I manage your schedule." }
-    ]);
-    const [inputMessage, setInputMessage] = useState("");
-    const [isProcessing, setIsProcessing] = useState(false);
-
-    // CHAT ZAEON (RESEARCH)
     const [liquidChatHistory, setLiquidChatHistory] = useState<{ role: 'user' | 'agent', text: string }[]>([
         { role: 'agent', text: "Zaeon initialized. Ready." }
     ]);
@@ -235,152 +447,267 @@ export default function LessonsModule() {
     const [isZaeonProcessing, setIsZaeonProcessing] = useState(false);
 
     const [storedPdfs, setStoredPdfs] = useState<StoredDoc[]>([]);
-    const [generatedDocs, setGeneratedDocs] = useState<StoredDoc[]>([]);
-
+    
+    // STATE - AI MODULES NO BACKPACK (Apenas 1 módulo inicial agora)
     const [userModules, setUserModules] = useState<UserModule[]>([
-        { id: 1, title: "Personal Backpack", items: [] },
-        { id: 2, title: "Project Archives", items: [] }
+        { id: 1, title: "Personal Backpack", items: [] }
     ]);
-
-    const [selectedUser, setSelectedUser] = useState<any>(null);
+    
+    // REF PARA JANELAS FLUTUANTES (Re-Foco)
+    const aiWindows = useRef<{ [key: string]: Window | null }>({});
+    
+    // SERVIÇOS DE IA PARA O LAUNCHER MINIMALISTA
+    const aiServices = [
+        { 
+            id: 'gpt', name: "ChatGPT", url: "https://chat.openai.com", color: "bg-[#10a37f]", 
+            logo: "https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg" 
+        },
+        { 
+            id: 'claude', name: "Claude", url: "https://claude.ai", color: "bg-[#d97757]", 
+            logo: "https://cdn.simpleicons.org/anthropic/white" 
+        },
+        { 
+            id: 'gemini', name: "Gemini", url: "https://gemini.google.com", color: "bg-[#1d4ed8]", 
+            logo: "https://cdn.simpleicons.org/googlegemini/white" 
+        },
+        { 
+            id: 'qwen', name: "Qwen", url: "https://chat.qwenlm.ai", color: "bg-[#6366f1]", 
+            logo: "/logos/qwen.png", // Imagem local que vai adicionar
+            fallbackIcon: Brain 
+        } 
+    ];
 
     const constraintsRef = useRef(null);
-    const chatScrollRef = useRef<HTMLDivElement>(null);
     const zaeonChatScrollRef = useRef<HTMLDivElement>(null);
     const agendaRef = useRef<HTMLDivElement>(null);
-
-    // --- AUTO SCROLL CHATS ---
-    useEffect(() => {
-        if (chatScrollRef.current) chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-    }, [chatHistory]);
 
     useEffect(() => {
         if (zaeonChatScrollRef.current) zaeonChatScrollRef.current.scrollTop = zaeonChatScrollRef.current.scrollHeight;
     }, [liquidChatHistory]);
 
-    // --- PERSISTENCE LOGIC (LOAD) ---
+    // LOAD DATA
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const savedClasses = localStorage.getItem('zaeon_schedule_data');
             const savedSticky = localStorage.getItem('zaeon_sticky_note');
-
-            // Restore Chats
-            const savedChat = localStorage.getItem('zaeon_chat_history');
+            const savedPluggedDay = localStorage.getItem('zaeon_plugged_day');
+            const savedGadgetOn = localStorage.getItem('zaeon_gadget_on');
+            
             const savedLiquidChat = localStorage.getItem('zaeon_liquid_chat');
-
-            // Restore Files & Modules
             const savedDocs = localStorage.getItem('zaeon_stored_pdfs');
             const savedModules = localStorage.getItem('zaeon_user_modules');
 
-            // Restore Gadgets State
-            const savedPluggedDay = localStorage.getItem('zaeon_plugged_day');
-            const savedGadgetOn = localStorage.getItem('zaeon_gadget_on');
-
             if (savedClasses) setClasses(JSON.parse(savedClasses));
             if (savedSticky) setStickyText(savedSticky);
-
-            if (savedChat) setChatHistory(JSON.parse(savedChat));
-            if (savedLiquidChat) setLiquidChatHistory(JSON.parse(savedLiquidChat));
-            if (savedDocs) setStoredPdfs(JSON.parse(savedDocs));
-            if (savedModules) setUserModules(JSON.parse(savedModules));
-
             if (savedPluggedDay) setPluggedDay(JSON.parse(savedPluggedDay));
             if (savedGadgetOn) setGadgetOn(JSON.parse(savedGadgetOn));
+            
+            if (savedLiquidChat) setLiquidChatHistory(JSON.parse(savedLiquidChat));
+            if (savedDocs) setStoredPdfs(JSON.parse(savedDocs));
+            
+            // Segurança: Garante que a mochila carrega limpa, sem o "Project Archives"
+            if (savedModules) {
+                const parsedModules = JSON.parse(savedModules).filter((m: any) => m.id !== 2);
+                setUserModules(parsedModules.length > 0 ? parsedModules : [{ id: 1, title: "Personal Backpack", items: [] }]);
+            }
 
             setIsDataLoaded(true);
         }
-        if (session?.user) {
-            setSelectedUser({ ...session.user, role: (session.user as any).role || 'ARCHITECT' });
-        } else {
-            setSelectedUser({ name: "Operative", role: "ARCHITECT", course: "Computer Science" });
-        }
-    }, [session]);
+    }, []);
 
-    // --- PERSISTENCE LOGIC (SAVE) ---
+    // SAVE DATA: Nuvem e Local
     useEffect(() => {
         if (isDataLoaded) {
-            // Salva dados no LocalStorage
             localStorage.setItem('zaeon_schedule_data', JSON.stringify(classes));
             localStorage.setItem('zaeon_sticky_note', stickyText);
-            localStorage.setItem('zaeon_chat_history', JSON.stringify(chatHistory));
+            localStorage.setItem('zaeon_plugged_day', JSON.stringify(pluggedDay));
+            localStorage.setItem('zaeon_gadget_on', JSON.stringify(gadgetOn));
             localStorage.setItem('zaeon_liquid_chat', JSON.stringify(liquidChatHistory));
             localStorage.setItem('zaeon_stored_pdfs', JSON.stringify(storedPdfs));
             localStorage.setItem('zaeon_user_modules', JSON.stringify(userModules));
-            localStorage.setItem('zaeon_plugged_day', JSON.stringify(pluggedDay));
-            localStorage.setItem('zaeon_gadget_on', JSON.stringify(gadgetOn));
 
-            // INTEGRAÇÃO PRISMA: Salva também no banco de dados via API se o usuário estiver logado
             if (session?.user?.email) {
-                const layoutState = { showYearBoard, gadgetOn, pluggedDay, showSticky };
-                fetch('/api/workspace', { 
+                fetch('/api/workspace', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         userId: session.user.email,
                         schedule: classes,
                         stickyNote: stickyText,
-                        chatHistory: chatHistory,
                         zaeonChat: liquidChatHistory,
                         library: storedPdfs,
                         personalModules: userModules,
-                        layoutState: layoutState
+                        layoutState: { gadgetOn, pluggedDay }
                     })
                 }).catch(err => console.error("Falha ao sincronizar com MongoDB:", err));
             }
         }
-    }, [classes, stickyText, chatHistory, liquidChatHistory, storedPdfs, userModules, pluggedDay, gadgetOn, isDataLoaded, showYearBoard, showSticky, session]);
+    }, [classes, stickyText, pluggedDay, gadgetOn, liquidChatHistory, storedPdfs, userModules, isDataLoaded, session]);
 
+    const handleBackgroundClick = () => {
+        if (selectedClass?.isDraft) {
+            setSelectedClass(null);
+            setHasUnsavedChanges(false);
+        }
+    };
 
-    // --- HANDLER: ASSISTANT CHAT (Agenda Control) ---
-    const handleAssistantMessage = async () => {
-        if (!inputMessage.trim()) return;
-        const userMsg = inputMessage;
-        setChatHistory(prev => [...prev, { role: 'user', text: userMsg }]);
-        setInputMessage("");
-        setIsProcessing(true);
+    const handleDayClick = (e: React.MouseEvent, dayIdx: number) => {
+        e.stopPropagation(); 
+        
+        if (!session?.user) {
+            alert("Operative access required to edit schedule.");
+            return;
+        }
 
-        try {
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    prompt: userMsg,
-                    agent: "zenita",
-                    systemContext: JSON.stringify(classes)
-                })
-            });
-            const data = await response.json();
-            if (data.toolCall && data.toolCall.name === "update_schedule") {
-                const args = data.toolCall.args;
-                setClasses(prevClasses => {
-                    let newClasses = [...prevClasses];
-                    if (args.action === "add" || args.action === "update") {
-                        newClasses = newClasses.filter(c => !(c.days.includes(args.day) && c.hour === args.hour));
-                        newClasses.push({
-                            id: Date.now(),
-                            name: args.name || "New Event",
-                            teacher: args.teacher || "Self-Study",
-                            room: args.room || "Virtual",
-                            days: [args.day],
-                            hour: args.hour,
-                            color: "from-emerald-400 to-teal-500",
-                            duration: args.duration || 1 // Support duration from AI
-                        });
-                    }
-                    else if (args.action === "remove") {
-                        newClasses = newClasses.filter(c => !(c.days.includes(args.day) && c.hour === args.hour));
-                    }
-                    return newClasses;
-                });
-                setChatHistory(prev => [...prev, { role: 'ai', text: `Schedule updated: ${args.action}.` }]);
-            } else {
-                setChatHistory(prev => [...prev, { role: 'ai', text: data.text || "Command processed." }]);
+        const dayNum = dayIdx + 1;
+
+        if (selectedClass && (selectedClass.isDraft || hasUnsavedChanges)) {
+            const newDays = selectedClass.days.includes(dayNum)
+                ? selectedClass.days.filter((d: number) => d !== dayNum)
+                : [...selectedClass.days, dayNum];
+            
+            if (newDays.length > 0) {
+                setSelectedClass({ ...selectedClass, days: newDays });
+                setHasUnsavedChanges(true);
             }
-        } catch (e) {
-            console.error(e);
-            setChatHistory(prev => [...prev, { role: 'ai', text: "Error connecting to Neural Core." }]);
-        } finally {
-            setIsProcessing(false);
+        } else {
+            const newDraft = {
+                id: Date.now(),
+                name: "",
+                teacher: "",
+                room: "",
+                days: [dayNum],
+                hour: 8,
+                endHour: 10,
+                color: CLASS_COLORS[0], 
+                duration: 2,
+                isDraft: true 
+            };
+            setSelectedClass(newDraft);
+            setHasUnsavedChanges(true);
+        }
+    };
+
+    const handleUpdateClass = (field: string, value: string | number) => {
+        if (!selectedClass) return;
+        
+        let updatedClass = { ...selectedClass, [field]: value };
+
+        if (field === 'hour' || field === 'endHour') {
+            const valNum = value === "" ? "" : Number(value); 
+            updatedClass[field] = valNum;
+            
+            if (updatedClass.hour !== "" && updatedClass.endHour !== "") {
+                const start = Number(updatedClass.hour);
+                const end = Number(updatedClass.endHour);
+                if (end > start) {
+                    updatedClass.duration = end - start;
+                }
+            }
+        }
+        
+        setSelectedClass(updatedClass);
+        setHasUnsavedChanges(true);
+    };
+
+    const handleCycleColor = () => {
+        if (!selectedClass) return;
+        const currentIndex = CLASS_COLORS.indexOf(selectedClass.color);
+        const nextIndex = (currentIndex + 1) % CLASS_COLORS.length;
+        handleUpdateClass('color', CLASS_COLORS[nextIndex]);
+    };
+
+    const handleSaveClass = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        
+        if (!selectedClass.name || !selectedClass.teacher || selectedClass.hour === "" || selectedClass.endHour === "") {
+            alert("Nome, Professor e Horários são obrigatórios.");
+            return;
+        }
+
+        const start = Number(selectedClass.hour);
+        const end = Number(selectedClass.endHour);
+
+        if (start >= end || start < 6 || end > 23) {
+            alert("Horário inválido. A aula deve terminar depois de começar (entre 6h e 23h).");
+            return;
+        }
+
+        const finalizedClass = { 
+            ...selectedClass, 
+            hour: start, 
+            endHour: end, 
+            duration: end - start,
+            isDraft: false 
+        };
+
+        setClasses(prevClasses => {
+            const exists = prevClasses.some(c => c.id === finalizedClass.id);
+            if (exists) {
+                return prevClasses.map(c => c.id === finalizedClass.id ? finalizedClass : c);
+            } else {
+                return [...prevClasses, finalizedClass];
+            }
+        });
+        
+        setSelectedClass(finalizedClass);
+        setHasUnsavedChanges(false);
+    };
+
+    const handleDeleteClass = (e: React.MouseEvent, classId: number) => {
+        e.stopPropagation();
+        if (selectedClass?.isDraft) {
+            setSelectedClass(null);
+            setHasUnsavedChanges(false);
+            return;
+        }
+        
+        setClasses(prevClasses => prevClasses.filter(c => c.id !== classId));
+        if (selectedClass && selectedClass.id === classId) {
+            setSelectedClass(null);
+            setHasUnsavedChanges(false);
+        }
+    };
+
+    const handleCloseDetails = () => {
+        setSelectedClass(null);
+        setHasUnsavedChanges(false);
+    };
+
+    const classesToRender = useMemo(() => {
+        let list = [...classes];
+        if (selectedClass && (hasUnsavedChanges || selectedClass.isDraft)) {
+            const exists = list.some(c => c.id === selectedClass.id);
+            if (exists) {
+                list = list.map(c => c.id === selectedClass.id ? selectedClass : c);
+            } else {
+                list.push(selectedClass); 
+            }
+        }
+        return list;
+    }, [classes, selectedClass, hasUnsavedChanges]);
+
+
+    // --- ZAEON LAB / GADGETS ---
+    const handleGadgetDragEnd = (event: any, info: any) => {
+        if (!agendaRef.current) return;
+        const agendaRect = agendaRef.current.getBoundingClientRect();
+        const dropY = info.point.y;
+        const isNearBottom = dropY > agendaRect.bottom - 80 && dropY < agendaRect.bottom + 50;
+
+        if (isNearBottom && info.point.x > agendaRect.left && info.point.x < agendaRect.right) {
+            const colWidth = agendaRect.width / 5;
+            const colIndex = Math.floor((info.point.x - agendaRect.left) / colWidth);
+            if (colIndex >= 0 && colIndex <= 4) {
+                const realToday = (new Date().getDay() + 6) % 7; 
+                setPluggedDay(realToday); 
+                setSelectedClass(null);
+                setHasUnsavedChanges(false);
+            } else {
+                setPluggedDay(null);
+            }
+        } else {
+            setPluggedDay(null);
         }
     };
 
@@ -396,26 +723,6 @@ export default function LessonsModule() {
             const data = await response.json();
             setLiquidChatHistory(prev => [...prev, { role: 'agent', text: data.text || "Data retrieved." }]);
         } catch (e) { setLiquidChatHistory(prev => [...prev, { role: 'agent', text: "Connection offline." }]); } finally { setIsZaeonProcessing(false); }
-    };
-
-    const handleGadgetDragEnd = (event: any, info: any) => {
-        if (!agendaRef.current) return;
-        const agendaRect = agendaRef.current.getBoundingClientRect();
-        const dropY = info.point.y;
-        const isNearBottom = dropY > agendaRect.bottom - 80 && dropY < agendaRect.bottom + 50;
-
-        if (isNearBottom && info.point.x > agendaRect.left && info.point.x < agendaRect.right) {
-            const colWidth = agendaRect.width / 5;
-            const colIndex = Math.floor((info.point.x - agendaRect.left) / colWidth);
-            if (colIndex >= 0 && colIndex <= 4) {
-                setPluggedDay(colIndex);
-                setSelectedClass(null);
-            } else {
-                setPluggedDay(null);
-            }
-        } else {
-            setPluggedDay(null);
-        }
     };
 
     const handleUserModuleDrop = (e: React.DragEvent, moduleId: number) => {
@@ -447,103 +754,68 @@ export default function LessonsModule() {
         }
     };
 
-    const yearSquares = Array.from({ length: 365 }, (_, i) => Math.floor(Math.random() * 4));
     const days = ["Mon", "Tue", "Wed", "Thu", "Fri"];
-    const hours = Array.from({ length: 9 }, (_, i) => i + 8);
-    const formatTime = (h: number, dur: number = 1) => `${h.toString().padStart(2, '0')}:00 - ${(h + dur).toString().padStart(2, '0')}:00`;
+    const minHour = 6;
+    const maxHour = 22;
+    const totalHours = maxHour - minHour;
+    const hours = Array.from({ length: totalHours + 1 }, (_, i) => minHour + i);
 
     return (
-        <div ref={constraintsRef} className="relative min-h-screen w-full flex flex-col items-center p-8 bg-transparent font-sans selection:bg-cyan-500/30 text-slate-900 dark:text-white transition-colors duration-500 overflow-x-hidden">
+        <div ref={constraintsRef} onClick={handleBackgroundClick} className="relative min-h-screen w-full flex flex-col items-center p-8 bg-transparent font-sans selection:bg-cyan-500/30 text-slate-900 dark:text-white transition-colors duration-500 overflow-x-hidden">
+            <div className="h-10 pointer-events-none"></div>
 
-            {/* HEADER / ANNUAL FLOW */}
-            <section className="w-full max-w-[1400px] z-10 transition-all duration-700 pointer-events-auto mb-10">
-                <div className="flex justify-between items-center px-4 mb-4">
-                    <div className="flex items-center gap-3">
-                        <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 shadow-[0_0_15px_rgba(34,211,238,0.3)]"><Activity size={14} className="text-cyan-300" /></div>
-                        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/60">Annual Flow</h3>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {!showSticky && <button onClick={() => setShowSticky(true)} className="flex items-center gap-2 px-3 py-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 text-yellow-200 rounded-full text-[9px] font-bold uppercase tracking-wider backdrop-blur-md transition-all"><StickyNote size={12} /> Open Note</button>}
-                        <button onClick={() => setShowYearBoard(!showYearBoard)} className="text-white/40 hover:text-white transition-colors bg-white/5 hover:bg-white/10 p-2 rounded-full backdrop-blur-md">{showYearBoard ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</button>
-                    </div>
-                </div>
-                <AnimatePresence>{showYearBoard && (<motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden"><div className="w-full bg-white/5 backdrop-blur-2xl border border-white/10 p-6 rounded-[2rem] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1),0_20px_40px_-20px_rgba(0,0,0,0.5)]"><div className="overflow-x-auto pb-2 scrollbar-hide mask-fade-sides"><div className="grid grid-rows-7 grid-flow-col gap-[4px] w-max min-w-full">{yearSquares.map((level, i) => (<div key={i} className={`w-2.5 h-2.5 rounded-full transition-all duration-500 ${level === 0 ? 'bg-white/5' : level === 1 ? 'bg-cyan-900/40 shadow-[0_0_5px_rgba(8,145,178,0.2)]' : level === 2 ? 'bg-cyan-500/60 shadow-[0_0_8px_rgba(6,182,212,0.4)]' : 'bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.8)] scale-110'}`} />))}</div></div></div></motion.div>)}</AnimatePresence>
-            </section>
-
-            <div className="h-24 pointer-events-none"></div>
-
-            {/* 3. DRAGGABLE WORKSPACE */}
             <div className="flex justify-center items-start gap-6 flex-wrap z-20 relative w-full pb-10 min-h-[400px]">
 
-                {/* ASSISTANT CHAT (Left) */}
-                <motion.div drag dragConstraints={constraintsRef} className="group w-80 h-[380px] relative z-10">
-                    <div className="w-full h-full bg-[#0a0a0a]/90 backdrop-blur-2xl border border-white/10 p-5 rounded-[2.5rem] shadow-xl flex flex-col relative overflow-hidden">
-                        <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-2 z-10">
-                            <div className="flex items-center gap-2">
-                                <Sparkles size={12} className="text-cyan-400" />
-                                <span className="text-[9px] font-bold uppercase tracking-widest text-white/70">Assistant</span>
-                            </div>
-                            <div className="flex gap-2 items-center">
-                                <label className="cursor-pointer text-slate-400 hover:text-cyan-400 transition-colors">
-                                    <input type="file" className="hidden" onChange={(e) => {
-                                        if (e.target.files && e.target.files.length > 0) {
-                                            alert(`File ${e.target.files[0].name} selected for Assistant. (Logic to process this can be added).`);
-                                        }
-                                    }}/>
-                                    <UploadCloud size={14} />
-                                </label>
-                                {isProcessing && <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-ping"></div>}
-                            </div>
-                        </div>
-                        <div ref={chatScrollRef} className="flex-1 overflow-y-auto scrollbar-hide space-y-3 pr-1 py-2 z-10">
-                            {chatHistory.map((msg, idx) => (
-                                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[85%] p-2.5 rounded-2xl text-[10px] leading-relaxed font-medium ${msg.role === 'user' ? 'bg-cyan-500/10 text-cyan-200 border border-cyan-500/20' : 'bg-white/5 text-white/80 border border-white/5'}`}>{msg.text}</div></div>
-                            ))}
-                        </div>
-                        <div className="mt-2 pt-2 border-t border-white/5 flex gap-2 z-10">
-                            <input value={inputMessage} onChange={(e) => setInputMessage(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAssistantMessage()} disabled={isProcessing} placeholder="Type command..." className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-[10px] text-white placeholder:text-white/20 focus:outline-none focus:border-cyan-500/50 transition-colors" />
-                            <button onClick={handleAssistantMessage} disabled={isProcessing} className="p-2 bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-400 rounded-xl border border-cyan-500/30 transition-colors disabled:opacity-50"><Send size={12} /></button>
-                        </div>
-                    </div>
-                </motion.div>
+                {/* REAL-TIME TRACKER MODULE */}
+                <RealTimeModule classes={classes} pluggedDay={pluggedDay} gadgetOn={gadgetOn} session={session} dragConstraints={constraintsRef} />
 
-                {/* SCHEDULE (Center) */}
-                <motion.div ref={agendaRef} drag dragConstraints={constraintsRef} className="group w-64 h-[380px] relative z-10">
+                {/* SCHEDULE */}
+                <motion.div ref={agendaRef} drag dragConstraints={constraintsRef} className="group w-64 h-[380px] relative z-10" onClick={(e) => e.stopPropagation()}>
                     <div className={`w-full h-full backdrop-blur-xl border border-white/10 p-5 rounded-[2.5rem] shadow-xl flex flex-col items-center justify-between relative overflow-hidden bg-[#172554]/90 dark:bg-black/40`}>
                         <div className="w-full flex justify-between items-center mb-2 pointer-events-none">
                             <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/60">Agenda</span>
                             {pluggedDay !== null && <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-ping shadow-[0_0_10px_#22d3ee]"></div>}
                         </div>
                         <div className="w-full flex gap-2 justify-between h-full pointer-events-auto relative">
-                            {/* Time Grid Lines (Background) */}
-                            <div className="absolute inset-0 flex flex-col justify-between opacity-10 pointer-events-none z-0">
+                            {/* Grid de Horas */}
+                            <div className="absolute inset-0 flex flex-col-reverse justify-between opacity-10 pointer-events-none z-0">
                                 {hours.map(h => <div key={h} className="w-full h-px bg-white"></div>)}
                             </div>
-
+                            
                             {days.map((day, dIdx) => (
-                                <div key={day} className="flex flex-col h-full flex-1 items-center relative z-10">
-                                    {/* Plug Highlight */}
-                                    <div className={`absolute inset-0 rounded-lg transition-all duration-500 pointer-events-none ${pluggedDay === dIdx ? 'bg-cyan-500/10 border border-cyan-500/30 shadow-[0_0_15px_rgba(34,211,238,0.2)] animate-pulse' : ''}`} />
+                                <div 
+                                    key={day} 
+                                    onClick={(e) => handleDayClick(e, dIdx)}
+                                    className="flex flex-col h-full flex-1 items-center relative z-10 cursor-pointer hover:bg-white/5 transition-colors rounded-lg"
+                                >
+                                    {pluggedDay === dIdx && <div className={`absolute inset-0 rounded-lg transition-all duration-500 pointer-events-none bg-cyan-500/10 border border-cyan-500/30 shadow-[0_0_15px_rgba(34,211,238,0.2)] animate-pulse`} />}
 
-                                    {/* Slots Container */}
                                     <div className="flex-1 w-full relative">
-                                        {classes.filter((c: any) => c.days.includes(dIdx + 1)).map((cls: any) => {
-                                            const topPercent = ((cls.hour - 8) / 9) * 100;
-                                            const heightPercent = ((cls.duration || 1) / 9) * 100;
-
+                                        {classesToRender.filter((c: any) => c.days.includes(dIdx + 1)).map((cls: any) => {
+                                            const safeHour = cls.hour || minHour;
+                                            const safeEndHour = cls.endHour || safeHour + 1;
+                                            
+                                            // Lógica de Renderização De baixo para cima
+                                            const bottomPercent = ((safeHour - minHour) / totalHours) * 100;
+                                            const heightPercent = ((safeEndHour - safeHour) / totalHours) * 100;
+                                            const isSelected = selectedClass?.id === cls.id;
+                                            const isPending = isSelected && (hasUnsavedChanges || cls.isDraft);
+                                            
                                             return (
                                                 <div
                                                     key={cls.id}
-                                                    onPointerDown={(e) => { e.stopPropagation(); setSelectedClass(cls); setPluggedDay(null); }}
-                                                    className={`absolute left-0 right-0 rounded-[4px] cursor-pointer bg-gradient-to-br ${cls.color} opacity-80 hover:opacity-100 hover:scale-105 transition-all shadow-sm border border-white/10 z-20`}
-                                                    style={{ top: `${topPercent}%`, height: `calc(${heightPercent}% - 2px)` }}
+                                                    onClick={(e) => { e.stopPropagation(); setSelectedClass(cls); setHasUnsavedChanges(false); }}
+                                                    className={`absolute left-0 right-0 rounded-[4px] cursor-pointer bg-gradient-to-br ${cls.color} transition-all shadow-sm border z-20
+                                                        ${isSelected ? 'ring-2 ring-white scale-110 z-50 shadow-2xl' : 'hover:scale-105 border-white/10 opacity-80 hover:opacity-100'}
+                                                        ${isPending ? 'animate-pulse opacity-100 border-yellow-400' : ''}
+                                                    `}
+                                                    style={{ bottom: `${Math.max(0, bottomPercent)}%`, height: `calc(${Math.max(0, heightPercent)}% - 2px)` }}
                                                 />
                                             );
                                         })}
                                     </div>
-
                                     <div className="mt-2 w-full flex flex-col items-center justify-end h-8 relative">
-                                        {pluggedDay === dIdx ? (<motion.div layoutId="gadget-fuse" onClick={() => setPluggedDay(null)} className="w-full h-6 bg-[#222] border-t-2 border-cyan-500 rounded-b-md shadow-[0_0_10px_#22d3ee] flex items-center justify-center cursor-pointer hover:bg-[#333]"><div className={`w-2 h-2 rounded-full ${gadgetOn ? 'bg-cyan-400 shadow-[0_0_5px_#22d3ee]' : 'bg-gray-600'}`}></div></motion.div>) : (<div className="w-full h-1 bg-white/10 rounded-full mb-1"></div>)}
+                                        {pluggedDay === dIdx ? (<motion.div layoutId="gadget-fuse" onClick={(e) => {e.stopPropagation(); setPluggedDay(null);}} className="w-full h-6 bg-[#222] border-t-2 border-cyan-500 rounded-b-md shadow-[0_0_10px_#22d3ee] flex items-center justify-center cursor-pointer hover:bg-[#333]"><div className={`w-2 h-2 rounded-full ${gadgetOn ? 'bg-cyan-400 shadow-[0_0_5px_#22d3ee]' : 'bg-gray-600'}`}></div></motion.div>) : (<div className="w-full h-1 bg-white/10 rounded-full mb-1"></div>)}
                                         <span className={`text-[7px] font-bold transition-colors ${pluggedDay === dIdx ? 'text-cyan-300' : 'text-white/40'}`}>{day[0]}</span>
                                     </div>
                                 </div>
@@ -552,50 +824,107 @@ export default function LessonsModule() {
                     </div>
                 </motion.div>
 
-                {/* DETAILS CARD (Reactive) */}
-                <motion.div drag dragConstraints={constraintsRef} className="group w-52 h-52 relative">
-                    <div className={`w-full h-full backdrop-blur-xl border border-white/10 p-6 rounded-[2.5rem] shadow-xl flex flex-col justify-between relative overflow-hidden transition-colors duration-500
-                 ${selectedClass ? `bg-gradient-to-br ${selectedClass.color.replace('from-', 'bg-').split(' ')[0]} bg-opacity-20` : 'bg-black/40'}
-            `}>
+                {/* DETAILS CARD EDITÁVEL */}
+                <motion.div drag dragConstraints={constraintsRef} className="group w-52 h-52 relative z-30" onClick={(e) => e.stopPropagation()}>
+                    <div 
+                        className={`w-full h-full bg-white/90 dark:bg-black/40 backdrop-blur-xl border border-slate-300 dark:border-white/10 p-5 rounded-[2.5rem] shadow-xl flex flex-col justify-between relative overflow-hidden transition-colors duration-500 cursor-pointer ${selectedClass ? `bg-gradient-to-br ${selectedClass.color.replace('from-', 'bg-').split(' ')[0]} bg-opacity-90 dark:bg-opacity-20` : ''}`}
+                        onClick={handleCycleColor}
+                    >
                         {selectedClass ? (
-                            // VIEW MODE
                             <>
-                                <div className={`absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br ${selectedClass.color} rounded-full blur-[40px] opacity-40 animate-pulse pointer-events-none`}></div>
-                                <div className="relative z-10 flex justify-between items-start pointer-events-none">
-                                    <div className="flex items-center gap-1.5 bg-white/10 px-2 py-1 rounded-full border border-white/5">
-                                        <MapPin size={10} className="text-white/80" />
-                                        <span className="text-[9px] font-bold text-white/90">{selectedClass.room}</span>
+                                <button onClick={(e) => { e.stopPropagation(); handleCloseDetails(); }} className="absolute top-4 right-4 z-50 text-slate-500 dark:text-white/50 hover:text-slate-800 dark:hover:text-white"><X size={12}/></button>
+                                <div className={`absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br ${selectedClass.color} rounded-full blur-[40px] opacity-40 ${(hasUnsavedChanges || selectedClass.isDraft) ? 'animate-pulse' : ''} pointer-events-none`}></div>
+                                
+                                <div className="relative z-10 flex justify-between items-start mt-2" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex items-center gap-1.5 bg-white/50 dark:bg-white/10 px-2 py-1 rounded-full border border-slate-200 dark:border-white/5">
+                                        <MapPin size={10} className="text-slate-700 dark:text-white/80" />
+                                        <input 
+                                            type="text" 
+                                            value={selectedClass.room}
+                                            onChange={(e) => handleUpdateClass('room', e.target.value)}
+                                            className="w-16 bg-transparent border-none outline-none text-[9px] font-bold text-slate-800 dark:text-white/90 placeholder-slate-400 dark:placeholder-white/50"
+                                            placeholder="Room"
+                                        />
+                                    </div>
+                                    <div className="flex gap-1 z-20">
+                                        {(hasUnsavedChanges || selectedClass.isDraft) && (
+                                            <button 
+                                                onClick={handleSaveClass}
+                                                className="p-1.5 bg-emerald-500/20 hover:bg-emerald-500/40 border border-emerald-500/30 rounded-full text-emerald-600 dark:text-emerald-400 transition-colors shadow-sm dark:shadow-[0_0_10px_rgba(16,185,129,0.3)]"
+                                                title="Save Class"
+                                            >
+                                                <Check size={12} />
+                                            </button>
+                                        )}
+                                        <button 
+                                            onClick={(e) => handleDeleteClass(e, selectedClass.id)}
+                                            className="p-1.5 bg-red-500/10 hover:bg-red-500/20 dark:bg-red-500/20 dark:hover:bg-red-500/40 border border-red-500/30 rounded-full text-red-600 dark:text-red-400 transition-colors"
+                                            title="Delete Class"
+                                        >
+                                            <Trash2 size={12} />
+                                        </button>
                                     </div>
                                 </div>
-                                <div className="relative z-10 pointer-events-none mt-2">
-                                    <h2 className="text-sm font-bold text-white leading-tight drop-shadow-md mb-2">{selectedClass.name}</h2>
-                                    <div className="flex items-center gap-1.5 text-cyan-300">
+
+                                <div className="relative z-10 mt-2 flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+                                    <input 
+                                        type="text"
+                                        value={selectedClass.name}
+                                        onChange={(e) => handleUpdateClass('name', e.target.value)}
+                                        className="text-sm font-bold text-slate-900 dark:text-white leading-tight drop-shadow-sm dark:drop-shadow-md bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-white/20 focus:border-slate-400 dark:focus:border-white/50 outline-none w-full transition-colors"
+                                        placeholder="Class Name"
+                                    />
+                                    
+                                    <div className="flex items-center gap-1.5 text-indigo-600 dark:text-cyan-300">
                                         <Clock size={12} />
-                                        <span className="text-[10px] font-mono font-medium tracking-wide">{formatTime(selectedClass.hour, selectedClass.duration)}</span>
+                                        <div className="flex items-center gap-1">
+                                            <input 
+                                                type="number" 
+                                                value={selectedClass.hour === "" ? "" : selectedClass.hour}
+                                                onChange={(e) => handleUpdateClass('hour', e.target.value)}
+                                                className="w-8 bg-transparent border-b border-transparent hover:border-indigo-300 dark:hover:border-cyan-300/30 focus:border-indigo-400 dark:focus:border-cyan-300 outline-none text-[10px] font-mono font-medium tracking-wide text-center"
+                                                placeholder="8"
+                                            />
+                                            <span className="text-[10px] font-mono text-slate-600 dark:text-cyan-300">:00 - </span>
+                                            <input 
+                                                type="number" 
+                                                value={selectedClass.endHour === "" ? "" : selectedClass.endHour}
+                                                onChange={(e) => handleUpdateClass('endHour', e.target.value)}
+                                                className="w-8 bg-transparent border-b border-transparent hover:border-indigo-300 dark:hover:border-cyan-300/30 focus:border-indigo-400 dark:focus:border-cyan-300 outline-none text-[10px] font-mono font-medium tracking-wide text-center"
+                                                placeholder="10"
+                                            />
+                                            <span className="text-[10px] font-mono text-slate-600 dark:text-cyan-300">:00</span>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="relative z-10 bg-white/5 border border-white/10 p-2 rounded-xl flex items-center gap-2 backdrop-blur-md pointer-events-none mt-auto">
-                                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-white/10 to-transparent flex items-center justify-center text-white/70 shrink-0"><User size={10} /></div>
-                                    <div className="flex flex-col min-w-0">
-                                        <span className="text-[7px] uppercase text-white/30 font-bold">Mentor</span>
-                                        <span className="text-[9px] font-medium text-white/90 truncate">{selectedClass.teacher}</span>
+
+                                <div className="relative z-10 bg-white/60 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-2 rounded-xl flex items-center gap-2 backdrop-blur-md mt-auto" onClick={(e) => e.stopPropagation()}>
+                                    <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-gradient-to-br dark:from-white/10 dark:to-transparent flex items-center justify-center text-slate-500 dark:text-white/70 shrink-0"><User size={10} /></div>
+                                    <div className="flex flex-col min-w-0 w-full">
+                                        <span className="text-[7px] uppercase text-slate-500 dark:text-white/30 font-bold">Mentor</span>
+                                        <input 
+                                            type="text"
+                                            value={selectedClass.teacher}
+                                            onChange={(e) => handleUpdateClass('teacher', e.target.value)}
+                                            className="text-[9px] font-medium text-slate-800 dark:text-white/90 truncate bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-white/20 focus:border-slate-400 dark:focus:border-white/50 outline-none w-full"
+                                            placeholder="Teacher Name"
+                                        />
                                     </div>
                                 </div>
                             </>
                         ) : (
-                            // EMPTY MODE (Instructions)
-                            <div className="flex flex-col items-center justify-center h-full text-white/20 gap-2">
-                                <X size={16} />
-                                <span className="text-[9px] font-bold uppercase tracking-widest text-center">Use Chat to<br />Add Events</span>
+                            <div className="flex flex-col items-center justify-center h-full text-slate-400 dark:text-white/20 gap-2 pointer-events-none">
+                                <Plus size={16} className="text-slate-400 dark:text-white/40" />
+                                <span className="text-[9px] font-bold uppercase tracking-widest text-center">Click empty day<br/>to add Class</span>
                             </div>
                         )}
                     </div>
                 </motion.div>
 
-                {/* STICKY & PLUG (Colors Reverted) */}
+                {/* STICKY & PLUG */}
                 <AnimatePresence>
                     {showSticky && (
-                        <motion.div drag dragConstraints={constraintsRef} className="group w-40 h-40 relative z-20">
+                        <motion.div drag dragConstraints={constraintsRef} className="group w-40 h-40 relative z-20" onClick={(e) => e.stopPropagation()}>
                             <div className="w-full h-full bg-[#fbbf24] border border-yellow-600/30 p-5 rounded-[2rem] shadow-xl flex flex-col relative overflow-hidden">
                                 <button onClick={() => setShowSticky(false)} className="absolute top-3 right-3 text-yellow-900/40 hover:text-yellow-900 transition-colors opacity-0 group-hover:opacity-100 z-20"><X size={14} /></button>
                                 <div className="flex items-center gap-2 text-yellow-900 mb-2 font-black">
@@ -615,27 +944,54 @@ export default function LessonsModule() {
                     )}
                 </AnimatePresence>
 
-                <AnimatePresence>{pluggedDay === null && (<motion.div layoutId="gadget-fuse" drag onDragEnd={handleGadgetDragEnd} dragConstraints={constraintsRef} className="group w-16 h-24 relative z-50"><div className="w-full h-full bg-gradient-to-b from-[#333] to-[#111] border border-gray-600 rounded-md shadow-[0_10px_20px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.2)] flex flex-col items-center justify-between p-2 relative overflow-hidden"><div className="absolute -top-1 left-1/2 -translate-x-1/2 w-8 h-2 bg-yellow-600 rounded-t-sm shadow-sm"></div><button onPointerDown={(e) => { e.stopPropagation(); setGadgetOn(!gadgetOn); }} className={`w-8 h-8 rounded-full border-2 border-[#444] shadow-[0_2px_5px_rgba(0,0,0,0.5)] flex items-center justify-center transition-all ${gadgetOn ? 'bg-cyan-900 shadow-[inset_0_0_8px_#06b6d4]' : 'bg-[#222]'}`}><Power size={10} className={`transition-colors ${gadgetOn ? 'text-cyan-400' : 'text-gray-600'}`} /></button><div className="w-full h-8 bg-black/60 rounded border border-white/5 flex items-center justify-center relative overflow-hidden">{gadgetOn && <div className="absolute inset-0 bg-cyan-500/20 animate-pulse"></div>}<div className={`w-full h-[1px] bg-gray-700`}><motion.div animate={{ width: gadgetOn ? "100%" : "0%" }} className="h-full bg-cyan-400 shadow-[0_0_5px_#22d3ee]" /></div></div></div></motion.div>)}</AnimatePresence>
+                <AnimatePresence>
+                    {pluggedDay === null && (
+                        <motion.div layoutId="gadget-fuse" drag onDragEnd={handleGadgetDragEnd} dragConstraints={constraintsRef} className="group w-16 h-24 relative z-50" onClick={(e) => e.stopPropagation()}>
+                            <div className="w-full h-full bg-gradient-to-b from-[#333] to-[#111] border border-gray-600 rounded-md shadow-[0_10px_20px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.2)] flex flex-col items-center justify-between p-2 relative overflow-hidden">
+                                <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-8 h-2 bg-yellow-600 rounded-t-sm shadow-sm"></div>
+                                <button onClick={() => setGadgetOn(!gadgetOn)} className={`w-8 h-8 rounded-full border-2 border-[#444] shadow-[0_2px_5px_rgba(0,0,0,0.5)] flex items-center justify-center transition-all ${gadgetOn ? 'bg-cyan-900 shadow-[inset_0_0_8px_#06b6d4]' : 'bg-[#222]'}`}>
+                                    <Power size={10} className={`transition-colors ${gadgetOn ? 'text-cyan-400' : 'text-gray-600'}`} />
+                                </button>
+                                <div className="w-full h-8 bg-black/60 rounded border border-white/5 flex items-center justify-center relative overflow-hidden">
+                                    {gadgetOn && <div className="absolute inset-0 bg-cyan-500/20 animate-pulse"></div>}
+                                    <div className={`w-full h-[1px] bg-gray-700`}><motion.div animate={{ width: gadgetOn ? "100%" : "0%" }} className="h-full bg-cyan-400 shadow-[0_0_5px_#22d3ee]" /></div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
 
-            {/* 4. ZAEON & GADGETS */}
+            {/* 4. ZAEON CHAT & GADGETS */}
             <div className="w-full flex justify-center py-20 relative z-20">
-                <motion.div drag dragConstraints={constraintsRef} className="group relative flex items-center gap-10">
-                    {/* ENERGY CORDS ANIMATION */}
+                <motion.div drag dragConstraints={constraintsRef} className="group relative flex items-center gap-10" onClick={(e) => e.stopPropagation()}>
+                    
                     <div className="absolute inset-0 pointer-events-none overflow-visible">
-                        {[{ yStart: 130, yEnd: 84, delay: 0 }, { yStart: 340, yEnd: 356, delay: 0.2 }].map((cord, idx) => (
-                            <div key={idx} className="absolute left-[384px] overflow-visible">
-                                <svg width="80" height="450" className="overflow-visible opacity-30"><path d={`M 0 ${cord.yStart} C 40 ${cord.yStart}, 30 ${cord.yEnd}, 80 ${cord.yEnd}`} fill="none" stroke="#22d3ee" strokeWidth="2" /></svg>
-                                <svg width="80" height="450" className="absolute top-0 overflow-visible">
-                                    <motion.path d={`M 0 ${cord.yStart} C 40 ${cord.yStart}, 30 ${cord.yEnd}, 80 ${cord.yEnd}`} fill="none" stroke="#22d3ee" strokeWidth="3" strokeDasharray="10 40" initial={{ strokeDashoffset: 0 }} animate={{ strokeDashoffset: -100 }} transition={{ duration: 2, repeat: Infinity, ease: "linear", delay: cord.delay }} className="drop-shadow-[0_0_8px_#22d3ee]" />
+                        {[{ yStart: 130, yEnd: 100, delay: 0 }, { yStart: 320, yEnd: 350, delay: 0.2 }].map((cord, idx) => (
+                            <div key={idx} className="absolute left-[384px] top-0 overflow-visible">
+                                <svg width="100" height="450" className="absolute top-0 overflow-visible">
+                                    <path 
+                                        d={`M 0 ${cord.yStart} C 50 ${cord.yStart}, 50 ${cord.yEnd}, 100 ${cord.yEnd}`} 
+                                        fill="none" 
+                                        stroke="rgba(34, 211, 238, 0.25)" 
+                                        strokeWidth="3" 
+                                    />
+                                    <motion.path 
+                                        d={`M 0 ${cord.yStart} C 50 ${cord.yStart}, 50 ${cord.yEnd}, 100 ${cord.yEnd}`} 
+                                        fill="none" 
+                                        stroke="#22d3ee" 
+                                        strokeWidth="4" 
+                                        strokeDasharray="15 35" 
+                                        initial={{ strokeDashoffset: 0 }} 
+                                        animate={{ strokeDashoffset: -100 }} 
+                                        transition={{ duration: 1.5, repeat: Infinity, ease: "linear", delay: cord.delay }} 
+                                        className="drop-shadow-[0_0_12px_rgba(34,211,238,0.9)]" 
+                                    />
                                 </svg>
                             </div>
                         ))}
-                        <div className="absolute left-[382px] top-[125px] w-1 h-[40px] bg-cyan-400 shadow-[0_0_15px_#22d3ee] rounded-full animate-pulse" />
-                        <div className="absolute left-[382px] top-[335px] w-1 h-[40px] bg-cyan-400 shadow-[0_0_15px_#22d3ee] rounded-full animate-pulse" />
                     </div>
 
-                    {/* ZAEON CHAT (Fixed & Auto Scroll) */}
                     <div className="w-96 h-[450px] bg-white/10 dark:bg-black/40 bg-white/70 backdrop-blur-3xl border border-white/30 dark:border-white/10 rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden relative z-10 transition-all duration-500">
                         <div className="h-16 border-b border-white/20 flex items-center px-6 gap-4 bg-white/10">
                             <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-cyan-400 shadow-lg flex items-center justify-center border border-white/20"><Bot size={20} className="text-white" /></div>
@@ -647,7 +1003,7 @@ export default function LessonsModule() {
                                 <label className="cursor-pointer text-slate-400 hover:text-cyan-400 transition-colors">
                                     <input type="file" className="hidden" onChange={(e) => {
                                         if (e.target.files && e.target.files.length > 0) {
-                                            alert(`File ${e.target.files[0].name} selected for Zaeon. (Logic to process this can be added).`);
+                                            alert(`File ${e.target.files[0].name} selected for Zaeon.`);
                                         }
                                     }}/>
                                     <UploadCloud size={16} />
@@ -663,7 +1019,6 @@ export default function LessonsModule() {
                         </div>
                     </div>
 
-                    {/* GADGETS */}
                     <div className="flex flex-col gap-14 z-10">
                         <div onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const files = Array.from(e.dataTransfer.files); const pdfs = files.filter(f => f.type === 'application/pdf').map(f => ({ id: Math.random().toString(36).substr(2, 9), title: f.name, type: 'pdf' as const, size: (f.size / 1024 / 1024).toFixed(1) + 'mb' })); setStoredPdfs(prev => [...prev, ...pdfs]); }} className="h-32 min-w-[150px] max-w-[450px] bg-white/70 dark:bg-black/60 backdrop-blur-3xl border border-white/40 dark:border-white/10 rounded-[1.8rem] p-4 flex flex-col relative shadow-2xl"><div className="flex items-center justify-between mb-3 border-b border-blue-200/50 dark:border-white/20 pb-2"><div className="flex items-center gap-2"><Database size={13} className="text-blue-600 dark:text-cyan-400" /><span className="text-[10px] font-black uppercase tracking-widest">Library</span></div></div><div className="flex gap-2 items-center h-full overflow-x-auto scrollbar-hide pr-2">{storedPdfs.map(pdf => (<motion.div key={pdf.id} className="group/item w-20 h-20 bg-blue-50/50 dark:bg-white/10 rounded-xl border border-blue-200/50 dark:border-white/20 flex flex-col items-center justify-center gap-0.5 p-2 relative"><FileText size={22} className="text-blue-600 dark:text-cyan-400" /><span className="text-[8px] text-slate-900 dark:text-white font-black truncate w-full block">{pdf.title}</span></motion.div>))}
                             <label className="w-16 h-20 rounded-xl border-2 border-dashed border-blue-300/50 dark:border-white/30 flex items-center justify-center text-blue-400 dark:text-white hover:bg-blue-50 dark:hover:bg-white/10 hover:border-blue-500 cursor-pointer transition-all group/add shrink-0"><input type="file" className="hidden" accept=".pdf" onChange={handleLibraryUpload} /><Plus size={20} className="group-hover/add:scale-125 transition-transform" /></label>
@@ -673,35 +1028,85 @@ export default function LessonsModule() {
                 </motion.div>
             </div>
 
-            {/* 5. BACKPACK */}
-            <div className="w-full flex justify-center gap-8 pb-32 flex-wrap relative z-20">
+            {/* 5. BACKPACK MINIMALISTA (AGORA NA DIREITA PARA NÃO SOBREPOR AS IAs) */}
+            <div className="w-full flex justify-end gap-8 pb-32 pr-4 lg:pr-20 flex-wrap relative z-20 max-w-[1400px]">
                 {userModules.map((mod) => (
-                    <motion.div key={mod.id} drag dragConstraints={constraintsRef} className="h-44 min-w-[280px] max-w-[500px] flex-1 bg-white/70 dark:bg-black/60 backdrop-blur-3xl border border-white/40 dark:border-white/10 rounded-[1.8rem] p-5 flex flex-col relative shadow-xl">
-                        <div className="flex items-center justify-between mb-4 border-b border-emerald-200/50 dark:border-white/20 pb-2">
-                            <div className="flex items-center gap-2 w-full"><Briefcase size={14} className="text-emerald-500" /><span className="text-[10px] font-black uppercase tracking-widest">{mod.title}</span></div>
-                            <span className="text-[8px] text-slate-400 dark:text-white/40 font-mono ml-2 whitespace-nowrap">{mod.items.length} ITEMS</span>
-                        </div>
-                        <div className="flex gap-2 items-center h-full overflow-x-auto scrollbar-hide pr-2">
-                            {mod.items.map((item) => (
-                                <motion.div key={item.id} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} onPointerDown={(e) => e.stopPropagation()} onClick={() => item.type === 'link' && window.open(item.meta, '_blank')} className={`group/file w-20 h-24 rounded-xl border flex flex-col items-center justify-center gap-1 p-2 relative cursor-pointer transition-all shrink-0 shadow-sm ${item.type === 'link' ? 'bg-blue-50/40 dark:bg-blue-900/10 border-blue-200/50 dark:border-blue-500/20' : 'bg-emerald-50/30 dark:bg-emerald-900/10 border-emerald-200/50 dark:border-emerald-500/20'}`}>
-                                    <button onClick={(e) => { e.stopPropagation(); deleteUserItem(mod.id, item.id); }} className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/file:opacity-100 shadow-lg hover:scale-110 transition-all z-30 border border-white/50"><X size={10} strokeWidth={3} /></button>
-                                    {item.type === 'link' ? <Globe size={24} className="text-blue-500 dark:text-blue-400 relative z-10" /> : <FileText size={24} className="text-emerald-600 dark:text-emerald-400 drop-shadow-sm" />}
-                                    <span className="text-[8px] text-slate-900 dark:text-white font-black text-center truncate w-full block px-0.5 mt-1">{item.name}</span>
-                                </motion.div>
-                            ))}
-                            <div className="flex flex-col gap-1 shrink-0 ml-1">
-                                <label onPointerDown={(e) => e.stopPropagation()} className="w-10 h-10 rounded-lg border border-dashed border-emerald-300/50 dark:border-white/20 flex items-center justify-center text-emerald-500 dark:text-white hover:bg-emerald-50 dark:hover:bg-white/10 hover:border-emerald-500 cursor-pointer transition-all"><input type="file" className="hidden" multiple onChange={(e) => handleFileUpload(e, mod.id)} /><Plus size={16} /></label>
-                                <button onPointerDown={(e) => e.stopPropagation()} onClick={() => handleAddLink(mod.id)} className="w-10 h-10 rounded-lg border border-dashed border-blue-300/50 dark:border-white/20 flex items-center justify-center text-blue-500 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/10 hover:border-blue-500 cursor-pointer transition-all"><Globe size={16} /></button>
+                    <motion.div 
+                        key={mod.id} 
+                        drag 
+                        dragConstraints={constraintsRef} 
+                        className="h-auto min-h-[160px] min-w-[280px] max-w-[400px] flex-1 bg-white/70 dark:bg-black/60 backdrop-blur-3xl border border-white/40 dark:border-white/10 rounded-[1.8rem] p-5 flex flex-col relative shadow-xl" 
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex flex-col h-28 mb-2 shrink-0">
+                            <div className="flex items-center justify-between mb-3 border-b border-emerald-200/50 dark:border-white/20 pb-2">
+                                <div className="flex items-center gap-2 w-full"><Briefcase size={14} className="text-emerald-500" /><span className="text-[10px] font-black uppercase tracking-widest">{mod.title}</span></div>
+                                <span className="text-[8px] text-slate-400 dark:text-white/40 font-mono ml-2 whitespace-nowrap">{mod.items.length} ITEMS</span>
+                            </div>
+                            <div className="flex gap-2 items-center h-full overflow-x-auto scrollbar-hide pr-2">
+                                {mod.items.map((item) => (
+                                    <motion.div key={item.id} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} onPointerDown={(e) => e.stopPropagation()} onClick={() => item.type === 'link' && window.open(item.meta, '_blank')} className={`group/file w-16 h-20 rounded-xl border flex flex-col items-center justify-center gap-1 p-2 relative cursor-pointer transition-all shrink-0 shadow-sm ${item.type === 'link' ? 'bg-blue-50/40 dark:bg-blue-900/10 border-blue-200/50 dark:border-blue-500/20' : 'bg-emerald-50/30 dark:bg-emerald-900/10 border-emerald-200/50 dark:border-emerald-500/20'}`}>
+                                        <button onClick={(e) => { e.stopPropagation(); deleteUserItem(mod.id, item.id); }} className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/file:opacity-100 shadow-lg hover:scale-110 transition-all z-30 border border-white/50"><X size={10} strokeWidth={3} /></button>
+                                        {item.type === 'link' ? <Globe size={20} className="text-blue-500 dark:text-blue-400 relative z-10" /> : <FileText size={20} className="text-emerald-600 dark:text-emerald-400 drop-shadow-sm" />}
+                                        <span className="text-[7px] text-slate-900 dark:text-white font-black text-center truncate w-full block px-0.5 mt-1">{item.name}</span>
+                                    </motion.div>
+                                ))}
+                                <div className="flex flex-col gap-1 shrink-0 ml-1">
+                                    <label onClick={(e) => e.stopPropagation()} className="w-8 h-8 rounded-lg border border-dashed border-emerald-300/50 dark:border-white/20 flex items-center justify-center text-emerald-500 dark:text-white hover:bg-emerald-50 dark:hover:bg-white/10 hover:border-emerald-500 cursor-pointer transition-all"><input type="file" className="hidden" multiple onChange={(e) => handleFileUpload(e, mod.id)} /><Plus size={14} /></label>
+                                    <button onClick={(e) => {e.stopPropagation(); handleAddLink(mod.id);}} className="w-8 h-8 rounded-lg border border-dashed border-blue-300/50 dark:border-white/20 flex items-center justify-center text-blue-500 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/10 hover:border-blue-500 cursor-pointer transition-all"><Globe size={14} /></button>
+                                </div>
                             </div>
                         </div>
+
+                        {/* Barra AI Launcher Minimalista com Re-Foco */}
+                        <div className="pt-3 mt-auto flex items-center justify-between border-t border-slate-200/50 dark:border-white/10">
+                            <div className="flex items-center gap-1.5">
+                                <Bot size={12} className="text-indigo-500" />
+                                <span className="text-[8px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">AI Nodes</span>
+                            </div>
+                            <div className="flex gap-2">
+                                {aiServices.map((ai) => (
+                                    <button 
+                                        key={ai.id}
+                                        onClick={(e) => { 
+                                            e.stopPropagation(); 
+                                            const w = 420; 
+                                            const h = 750;
+                                            const left = 50; 
+                                            const top = 100;
+
+                                            // Lógica de RE-FOCO
+                                            if (aiWindows.current[ai.id] && !aiWindows.current[ai.id]?.closed) {
+                                                aiWindows.current[ai.id]?.focus();
+                                            } else {
+                                                aiWindows.current[ai.id] = window.open(
+                                                    ai.url, 
+                                                    ai.name, 
+                                                    `width=${w},height=${h},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`
+                                                );
+                                            }
+                                        }}
+                                        className={`w-9 h-9 rounded-full ${ai.color} text-white flex items-center justify-center shadow-md hover:scale-110 hover:shadow-xl transition-all border border-white/20 overflow-hidden`}
+                                        title={`Launch ${ai.name}`}
+                                    >
+                                        {ai.logo ? (
+                                            <img src={ai.logo} alt={ai.name} className="w-5 h-5 object-contain invert opacity-90" onError={(e) => e.currentTarget.style.display='none'} />
+                                        ) : (
+                                            ai.fallbackIcon && <ai.fallbackIcon size={14} strokeWidth={3} />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
                     </motion.div>
                 ))}
             </div>
 
-            {/* 6. COLLECTIVE BUILD ZONE */}
+            {/* COLLECTIVE BUILD ZONE */}
             <CollectiveZone classes={classes} currentUser={session?.user} dragConstraints={constraintsRef} />
 
-            {/* 7. NEURAL EDITOR */}
+            {/* NEURAL EDITOR (Garantido no final) */}
             <CollabEditor dragConstraints={constraintsRef} />
 
         </div>

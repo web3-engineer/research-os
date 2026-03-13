@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react"; // Adicionado Suspense
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeftIcon, CalendarDaysIcon } from "@heroicons/react/24/outline";
 
-export default function ArticlePage() {
+// Criamos um componente interno para isolar o uso do useSearchParams
+function ArticleContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const id = searchParams.get("id");
@@ -17,7 +18,6 @@ export default function ArticlePage() {
         
         const fetchArticle = async () => {
             try {
-                // Aqui você pode criar um endpoint /api/news/[id] ou filtrar no front
                 const res = await fetch('/api/news');
                 const data = await res.json();
                 const found = data.find((post: any) => post.id === id);
@@ -73,12 +73,20 @@ export default function ArticlePage() {
                     
                     <div className="w-full h-px bg-slate-200 dark:bg-white/10 mb-12" />
                     
-                    {/* Renderização do texto. Para renderizar quebras de linha corretamente, usamos whitespace-pre-wrap */}
                     <div className="prose prose-slate dark:prose-invert max-w-none text-lg leading-loose font-serif text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
                         {article.content}
                     </div>
                 </div>
             </div>
         </div>
+    );
+}
+
+// O export default envolve o conteúdo no Suspense exigido pelo Next.js
+export default function ArticlePage() {
+    return (
+        <Suspense fallback={<div className="h-screen flex items-center justify-center dark:text-white text-slate-800 tracking-widest uppercase text-xs">Initializing Neural Link...</div>}>
+            <ArticleContent />
+        </Suspense>
     );
 }

@@ -2,22 +2,25 @@
 
 import Image, { type StaticImageData } from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
-import brain from "@/app/zaeon-brain.png";
+
+// Definimos o caminho da imagem como uma constante (apontando para public/assets)
+const LOGO_DEFAULT = "/assets/zaeon-brain.png";
 
 type Props = {
     show?: boolean;
     onDone?: () => void;
     minDurationMs?: number;
+    // Aceita tanto o caminho (string) quanto um import estático
     logoSrc?: StaticImageData | string;
     hint?: string;
 };
 
 export default function MacSplash({
-                                      show = true,
-                                      onDone,
-                                      minDurationMs = 3000,
-                                      logoSrc = brain,
-                                  }: Props) {
+    show = true,
+    onDone,
+    minDurationMs = 3000,
+    logoSrc = LOGO_DEFAULT, // Agora usa a constante definida acima
+}: Props) {
     const [progress, setProgress] = useState(0);
     const [phase, setPhase] = useState<0 | 1 | 2 | 3 | 4>(0);
     const [visible, setVisible] = useState(show);
@@ -42,7 +45,6 @@ export default function MacSplash({
         setVisible(true);
         const openT = setTimeout(() => setOpacity(1), 10);
 
-        // Força o scroll manual logo na montagem
         if (typeof window !== "undefined") {
             window.history.scrollRestoration = "manual";
             window.scrollTo(0, 0);
@@ -58,13 +60,9 @@ export default function MacSplash({
 
             setProgress(eased);
 
-            // --- FORÇA BRUTA (AQUI ESTÁ A MÁGICA) ---
-            // Enquanto a animação não acabou (tela preta), forçamos o topo a cada frame.
-            // O navegador não tem chance de descer.
             if (!exitingRef.current && typeof window !== "undefined") {
                 window.scrollTo(0, 0);
             }
-            // ----------------------------------------
 
             if (eased >= 0.9 && phase < 4) setPhase(4);
             else if (eased >= 0.69 && phase < 3) setPhase(3);
@@ -76,7 +74,6 @@ export default function MacSplash({
             } else if (!exitingRef.current) {
                 exitingRef.current = true;
 
-                // Uma última garantia antes de começar o fade out
                 if (typeof window !== "undefined") window.scrollTo(0, 0);
 
                 if (!prefersReducedMotion) {
@@ -102,7 +99,7 @@ export default function MacSplash({
             clearTimeout(openT);
             cancelAnimationFrame(raf);
         };
-    }, [show, minDurationMs, prefersReducedMotion]);
+    }, [show, minDurationMs, prefersReducedMotion, phase, onDone]);
 
     useEffect(() => {
         if (!show && visible && !exitingRef.current) {
@@ -123,7 +120,6 @@ export default function MacSplash({
 
     if (!visible) return null;
 
-    // --- FRASES MÍSTICAS EM CHINÊS ---
     const zhPhrase =
         phase >= 4 || phase === 3
             ? "世界之希望已诞生"
@@ -147,7 +143,7 @@ export default function MacSplash({
                     filter: contentBlur ? `blur(${contentBlur}px)` : "none",
                 }}
             >
-                {/* Logo */}
+                {/* Logo - Agora carregando via path de public */}
                 <Image
                     src={logoSrc}
                     alt="Zaeon"
@@ -157,7 +153,6 @@ export default function MacSplash({
                     className="mb-6 opacity-95"
                 />
 
-                {/* Barra de progresso */}
                 <div className="w-[200px] h-[3px] rounded-full bg-white/15 overflow-hidden">
                     <div
                         className="h-full rounded-full"
@@ -175,7 +170,6 @@ export default function MacSplash({
                     />
                 </div>
 
-                {/* Frase Mística (Chinês) */}
                 {zhPhrase && (
                     <div
                         className="mt-6 text-center text-[10px] tracking-widest leading-tight text-sky-400/90 font-light"
@@ -188,7 +182,6 @@ export default function MacSplash({
                     </div>
                 )}
 
-                {/* Logs técnicos (Inglês) */}
                 <div
                     className="mt-4 text-center text-[9px] leading-tight text-white/60"
                     style={{

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const siteConfig: Metadata = {
   title: "Zaeon",
-  description: "The Research Operating System",
+  description: "The Study Operating System",
   keywords: [
     "reactjs",
     "nextjs",

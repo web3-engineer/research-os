@@ -56,7 +56,7 @@ export default function Home() {
         <main className="h-full w-full">
             <AnimatePresence mode="wait">
                 {showIntro && (
-                    <IntroOverlay key="intro-overlay" onComplete={handleIntroComplete} />
+                    <IntroOverlay key="intro-overlay" onDone={handleIntroComplete} />
                 )}
             </AnimatePresence>
 
