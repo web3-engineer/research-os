@@ -20,16 +20,13 @@ const NUM_BARS = 12;
 
 export const Navbar = () => {
   const { t } = useTranslation();
-  const { data: session } = useSession();
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
 
-  // --- ESTADOS DO PLAYER ---
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [showTrackName, setShowTrackName] = useState(false);
 
-  // --- REFS ---
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -42,32 +39,23 @@ export const Navbar = () => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
 
+  // 1. INICIALIZAÇÃO DO AUDIO
   useEffect(() => {
     setMounted(true);
-    
     if (!audioRef.current) {
-      const audio = new Audio(TRACKS[0]);
-      audio.crossOrigin = "anonymous";
-      audio.volume = 0.25; 
-      audio.onended = () => handleNextTrack();
-      audioRef.current = audio;
+      audioRef.current = new Audio(TRACKS[0]);
+      audioRef.current.crossOrigin = "anonymous";
+      audioRef.current.volume = 0.25;
+      audioRef.current.loop = true;
+      audioRef.current.onended = () => handleNextTrack();
     }
-    
-    // LÓGICA DE AUTOPLAY NA HOME
-    if (pathname === "/") {
-        // Tenta tocar automaticamente aproveitando a interação do IntroOverlay
-        setTimeout(() => {
-            togglePlay(true); 
-        }, 1000);
-    }
-
     return () => audioRef.current?.pause();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 2. MOTOR DE ÁUDIO (RESUME AUTOMÁTICO)
   const initAudioEngine = async () => {
     if (!audioRef.current) return;
-    
+
     if (!audioCtxRef.current) {
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
       audioCtxRef.current = new AudioContext();
@@ -79,13 +67,33 @@ export const Navbar = () => {
       sourceRef.current = audioCtxRef.current.createMediaElementSource(audioRef.current);
       sourceRef.current.connect(analyserRef.current);
       analyserRef.current.connect(audioCtxRef.current.destination);
-      visualize(); 
+      visualize();
     }
 
     if (audioCtxRef.current.state === "suspended") {
       await audioCtxRef.current.resume();
     }
   };
+
+  // 3. LOGICA MESTRE: SEMPRE TOCAR NA HOME
+  useEffect(() => {
+    if (mounted && pathname === "/") {
+      const handleHomeEntry = async () => {
+        await initAudioEngine();
+        
+        // Se estiver pausado, força o play
+        if (audioRef.current && audioRef.current.paused) {
+          audioRef.current.play()
+            .then(() => setIsPlaying(true))
+            .catch((e) => console.log("Aguardando clique para iniciar som na Home..."));
+        }
+      };
+      
+      // Pequeno delay para garantir que a transição de página terminou
+      const timer = setTimeout(handleHomeEntry, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [pathname, mounted]);
 
   const visualize = () => {
     if (!analyserRef.current) return;
@@ -98,7 +106,6 @@ export const Navbar = () => {
 
       barsRef.current.forEach((bar, i) => {
         if (!bar) return;
-
         if (playing && analyserRef.current) {
           analyserRef.current.getByteFrequencyData(dataArray);
           const val = dataArray[i * 2] || 0;
@@ -116,19 +123,15 @@ export const Navbar = () => {
     render();
   };
 
-  const togglePlay = async (forcePlay = false) => {
+  const togglePlay = async () => {
     if (!audioRef.current) return;
     await initAudioEngine();
 
-    if (isPlaying && !forcePlay) {
+    if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.play().then(() => {
-          setIsPlaying(true);
-      }).catch(() => {
-          console.log("Autoplay bloqueado pelo browser.");
-      });
+      audioRef.current.play().then(() => setIsPlaying(true));
     }
   };
 
@@ -137,7 +140,7 @@ export const Navbar = () => {
     const next = (currentTrackIndex + 1) % TRACKS.length;
     setCurrentTrackIndex(next);
     audioRef.current.src = TRACKS[next];
-    if (isPlaying) audioRef.current.play();
+    if (isPlayingRef.current) audioRef.current.play();
   };
 
   const handlePrevTrack = () => {
@@ -145,31 +148,21 @@ export const Navbar = () => {
     const prev = (currentTrackIndex - 1 + TRACKS.length) % TRACKS.length;
     setCurrentTrackIndex(prev);
     audioRef.current.src = TRACKS[prev];
-    if (isPlaying) audioRef.current.play();
+    if (isPlayingRef.current) audioRef.current.play();
   };
 
   const getTrackName = () => TRACKS[currentTrackIndex].split('/').pop()?.replace('.mp3', '') || 'Track';
-
-  // --- LÓGICA DE HIGHLIGHT ---
-  const checkActive = (path: string) => {
-    if (path === "/") return pathname === "/";
-    return pathname.startsWith(path);
-  };
-
+  const checkActive = (path: string) => pathname.startsWith(path);
   const getLinkClassName = (path: string) => {
     const active = checkActive(path);
-    const base = "transition-all duration-300 hover:scale-105 uppercase tracking-widest text-[11px] font-bold";
-    const activeStyle = "text-cyan-500 drop-shadow-[0_0_10px_rgba(34,211,238,0.8)] scale-110";
-    const inactiveStyle = "text-foreground/60 hover:text-cyan-400";
-    
-    return `${base} ${active ? activeStyle : inactiveStyle}`;
+    return `transition-all duration-300 uppercase tracking-[0.2em] text-[10px] font-black ${active ? "text-cyan-500 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)] scale-110" : "text-foreground/50 hover:text-cyan-400"}`;
   };
 
-  if (!mounted) return <div className="w-full h-[90px] fixed top-0 z-[100]" />;
+  if (!mounted) return null;
 
   return (
     <div className="w-full h-[90px] fixed top-0 z-[100] flex justify-center items-center pointer-events-none">
-      <div className="pointer-events-auto w-[96%] max-w-[1300px] h-[70px] rounded-[35px] backdrop-blur-xl bg-background/70 border border-foreground/10 shadow-2xl flex items-center justify-between px-8 transition-all duration-500">
+      <div className="pointer-events-auto w-[96%] max-w-[1300px] h-[70px] rounded-[35px] backdrop-blur-xl bg-background/70 border border-foreground/10 shadow-2xl flex items-center justify-between px-8">
         
         <Link href="/" className="hover:scale-105 transition-transform">
           <Image src={logoPng} alt="logo" width={220} height={100} priority className="h-10 w-auto object-contain invert dark:invert-0" />
@@ -184,40 +177,25 @@ export const Navbar = () => {
 
         <div className="flex items-center gap-6">
           <div className="flex items-center bg-foreground/5 dark:bg-white/5 backdrop-blur-2xl border border-foreground/10 dark:border-white/10 rounded-full px-4 py-2 transition-all">
-            
             <div className="flex items-center gap-3 mr-4">
               <button onClick={handlePrevTrack} className="text-foreground/40 hover:text-cyan-500 transition-colors text-xs">⏮</button>
-              <button onClick={() => togglePlay()} className="text-foreground hover:text-cyan-500 transition-all text-xl w-6">
+              <button onClick={togglePlay} className="text-foreground hover:text-cyan-500 transition-all text-xl w-6">
                 {isPlaying ? "⏸" : "▶"}
               </button>
               <button onClick={handleNextTrack} className="text-foreground/40 hover:text-cyan-500 transition-colors text-xs">⏭</button>
             </div>
-
             <div className="w-[1px] h-4 bg-foreground/20 dark:bg-white/20 mr-4"></div>
-
-            <div 
-              className="flex items-center gap-3 cursor-pointer"
-              onClick={() => setShowTrackName(!showTrackName)}
-            >
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => setShowTrackName(!showTrackName)}>
               <div className="flex items-end gap-[3px] h-5 w-auto">
                 {Array.from({ length: NUM_BARS }).map((_, i) => (
-                  <div
-                    key={i}
-                    ref={(el) => { barsRef.current[i] = el; }}
-                    className="w-[3px] rounded-t-[1.5px] bg-cyan-500 shadow-[0_0_8px_rgba(34,211,238,0.4)]"
-                    style={{ height: '30%' }}
-                  />
+                  <div key={i} ref={(el) => { barsRef.current[i] = el; }} className="w-[3px] rounded-t-[1.5px] bg-cyan-500 shadow-[0_0_8px_rgba(34,211,238,0.4)]" style={{ height: '30%' }} />
                 ))}
               </div>
-
               <div className={`overflow-hidden transition-all duration-500 ${showTrackName ? 'max-w-[150px] opacity-100' : 'max-w-0 opacity-0'}`}>
-                <span className="text-[10px] font-black tracking-tighter whitespace-nowrap text-cyan-600 dark:text-cyan-400 uppercase">
-                   {getTrackName()}
-                </span>
+                <span className="text-[10px] font-black tracking-tighter whitespace-nowrap text-cyan-600 dark:text-cyan-400 uppercase">{getTrackName()}</span>
               </div>
             </div>
           </div>
-
           <ThemeToggle />
         </div>
       </div>

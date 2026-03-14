@@ -28,21 +28,7 @@ export default function HeroSceneController() {
 
   return (
     <>
-      {/* IMAGEM LATERAL */}
-      <motion.div
-        initial={{ x: "100%", opacity: 0 }}
-        animate={{ x: show ? 0 : "100%", opacity: show ? 1 : 0 }}
-        transition={transition}
-        className="absolute -right-80 top-20 bottom-0 w-[85vw] pointer-events-none z-10 hidden lg:block overflow-hidden"
-      >
-        <Image
-          src="/assets/zaeon-ai.png"
-          alt="zaeon-ai"
-          fill
-          className="object-right object-top object-contain"
-          priority
-        />
-      </motion.div>
+
 
       {/* CONTEÚDO PRINCIPAL - COLUNA COM LARGURA TRAVADA */}
       <div className={`flex flex-col items-start z-20 ${fixedWidth}`}>

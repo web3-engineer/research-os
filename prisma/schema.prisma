@@ -138,19 +138,35 @@ model NewsPost {
   updatedAt   DateTime @updatedAt
 }
 
+// --- NOVO MODELO DE PLUGINS (GAMIFIED STORE) ---
+model Plugin {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  name              String
+  author            String   @default("Zaeon Core")
+  description       String
+  category          String   // Essencial, Agentes, Mentorias, Blockchain
+  tag               String?  // Livre, Alunos, VIP
+  price             Float    @default(0)
+  actionUrl         String
+  isLocked          Boolean  @default(false)
+  unlockRequirement String?  // Ex: "Nível 5 necessário"
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
 model Account {
-  id                String  @id @default(auto()) @map("_id") @db.ObjectId
-  userId            String  @db.ObjectId
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.String
-  access_token      String? @db.String
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.String
-  session_state     String?
+  id                 String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId             String  @db.ObjectId
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String? @db.String
+  access_token       String? @db.String
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String? @db.String
+  session_state      String?
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([provider, providerAccountId])
 }
