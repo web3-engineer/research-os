@@ -3,204 +3,204 @@
 import Image, { type StaticImageData } from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-// REMOVIDO: import brain from "/assets/zaeon-brain.png"; 
-// ARQUIVOS EM 'PUBLIC' SÃO ACESSADOS POR STRING, NÃO POR IMPORT.
+const LOGO_DEFAULT = "/assets/zaeon-brain.png";
+
+// ==========================================
+// CONFIGURAÇÃO DA LINHA DO TEMPO (Cravado em 7s)
+// Evolução a cada 1.8 segundos
+// ==========================================
+const TIMELINE = {
+    AUDIO_SRC: "/assets/sounds/boot-track.mp3",
+    TOTAL_DURATION: 7.0, 
+    
+    STAGE_2_BAR_APPEARS: 0.1, // Barra surge instantaneamente
+    STAGE_3_MOD_1_START: 1.8, // Módulo 1
+    STAGE_4_MOD_2_START: 3.6, // Módulo 2 (1.8 * 2)
+    STAGE_5_MOD_3_START: 5.4, // Módulo 3 (1.8 * 3)
+};
 
 type Props = {
     show?: boolean;
     onDone?: () => void;
-    minDurationMs?: number;
     logoSrc?: StaticImageData | string;
-    hint?: string;
 };
 
 export default function MacSplash({
     show = true,
     onDone,
-    minDurationMs = 3000,
-    // Definimos o caminho padrão diretamente como string
-    logoSrc = "/assets/zaeon-brain.png", 
+    logoSrc = LOGO_DEFAULT,
 }: Props) {
-    const [progress, setProgress] = useState(0);
+    const [hasStarted, setHasStarted] = useState(false);
     const [phase, setPhase] = useState<0 | 1 | 2 | 3 | 4>(0);
     const [visible, setVisible] = useState(show);
     const [opacity, setOpacity] = useState(0);
-    const [contentScale, setContentScale] = useState(1);
-    const [contentBlur, setContentBlur] = useState(0);
-    const startedAt = useRef<number | null>(null);
+
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const progressBarRef = useRef<HTMLDivElement>(null);
+    const percentText1Ref = useRef<HTMLSpanElement>(null);
+    const percentText2Ref = useRef<HTMLSpanElement>(null);
+    const percentText3Ref = useRef<HTMLSpanElement>(null);
+    
+    const isAudioPlaying = useRef(false);
+    const startTimeRef = useRef<number | null>(null);
+    
     const exitingRef = useRef(false);
+    const phaseRef = useRef<0 | 1 | 2 | 3 | 4>(0);
 
-    const prefersReducedMotion = useMemo(
-        () =>
-            typeof window !== "undefined" &&
-            window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
-        []
-    );
-
-    const ease = (t: number) => 1 - Math.pow(1 - t, 3);
+    const onDoneRef = useRef(onDone);
+    useEffect(() => {
+        onDoneRef.current = onDone;
+    }, [onDone]);
 
     useEffect(() => {
         if (!show) return;
-
         setVisible(true);
         const openT = setTimeout(() => setOpacity(1), 10);
+        return () => clearTimeout(openT);
+    }, [show]);
 
-        if (typeof window !== "undefined") {
-            window.history.scrollRestoration = "manual";
-            window.scrollTo(0, 0);
-        }
+    useEffect(() => {
+        if (!show || !hasStarted) return;
 
         let raf = 0;
-        const loop = (ts: number) => {
-            if (!startedAt.current) startedAt.current = ts;
-            const elapsed = ts - startedAt.current;
-            const total = Math.max(1, minDurationMs);
-            const t = Math.min(1, elapsed / total);
-            const eased = prefersReducedMotion ? t : ease(t);
 
-            setProgress(eased);
+        const loop = () => {
+            // Calcula o tempo base mesclando o áudio e o tempo real (evita travamentos)
+            const realTimeElapsed = (performance.now() - (startTimeRef.current || performance.now())) / 1000;
+            const audioTime = (isAudioPlaying.current && audioRef.current && !audioRef.current.ended) 
+                ? audioRef.current.currentTime 
+                : realTimeElapsed;
+            
+            // Usa sempre o maior tempo para garantir que a UI não congele se o áudio falhar ou for mais curto
+            const time = Math.max(audioTime, realTimeElapsed);
 
-            if (!exitingRef.current && typeof window !== "undefined") {
-                window.scrollTo(0, 0);
+            let currentGlobalPercent = 0;
+
+            if (time >= TIMELINE.STAGE_5_MOD_3_START) {
+                if (phaseRef.current < 4) { phaseRef.current = 4; setPhase(4); }
+                const duration = TIMELINE.TOTAL_DURATION - TIMELINE.STAGE_5_MOD_3_START;
+                const elapsed = time - TIMELINE.STAGE_5_MOD_3_START;
+                currentGlobalPercent = 75 + Math.min((elapsed / duration) * 25, 25);
+                if (percentText3Ref.current) percentText3Ref.current.innerText = Math.floor(currentGlobalPercent).toString();
+
+            } else if (time >= TIMELINE.STAGE_4_MOD_2_START) {
+                if (phaseRef.current < 3) { phaseRef.current = 3; setPhase(3); }
+                const duration = TIMELINE.STAGE_5_MOD_3_START - TIMELINE.STAGE_4_MOD_2_START;
+                const elapsed = time - TIMELINE.STAGE_4_MOD_2_START;
+                currentGlobalPercent = 40 + Math.min((elapsed / duration) * 35, 35);
+                if (percentText2Ref.current) percentText2Ref.current.innerText = Math.floor(currentGlobalPercent).toString();
+
+            } else if (time >= TIMELINE.STAGE_3_MOD_1_START) {
+                if (phaseRef.current < 2) { phaseRef.current = 2; setPhase(2); }
+                const duration = TIMELINE.STAGE_4_MOD_2_START - TIMELINE.STAGE_3_MOD_1_START;
+                const elapsed = time - TIMELINE.STAGE_3_MOD_1_START;
+                currentGlobalPercent = Math.min((elapsed / duration) * 40, 40);
+                if (percentText1Ref.current) percentText1Ref.current.innerText = Math.floor(currentGlobalPercent).toString();
+
+            } else if (time >= TIMELINE.STAGE_2_BAR_APPEARS) {
+                if (phaseRef.current < 1) { phaseRef.current = 1; setPhase(1); }
+                currentGlobalPercent = 1; 
             }
 
-            if (eased >= 0.9 && phase < 4) setPhase(4);
-            else if (eased >= 0.69 && phase < 3) setPhase(3);
-            else if (eased >= 0.51 && phase < 2) setPhase(2);
-            else if (eased >= 0.33 && phase < 1) setPhase(1);
+            if (progressBarRef.current) {
+                progressBarRef.current.style.width = `${Math.max(0, currentGlobalPercent)}%`;
+            }
 
-            if (t < 1) {
+            if (time < TIMELINE.TOTAL_DURATION && !exitingRef.current) {
                 raf = requestAnimationFrame(loop);
             } else if (!exitingRef.current) {
                 exitingRef.current = true;
-
-                if (typeof window !== "undefined") window.scrollTo(0, 0);
-
-                if (!prefersReducedMotion) {
-                    setContentScale(0.985);
-                    setContentBlur(4);
-                }
                 setOpacity(0);
                 setTimeout(() => {
-                    onDone?.();
+                    onDoneRef.current?.();
                     setVisible(false);
-                    startedAt.current = null;
-                    exitingRef.current = false;
-                    setProgress(0);
-                    setPhase(0);
-                    setContentScale(1);
-                    setContentBlur(0);
-                }, prefersReducedMotion ? 0 : 260);
+                    if (audioRef.current) {
+                        audioRef.current.pause();
+                        audioRef.current.currentTime = 0;
+                    }
+                }, 300);
             }
         };
 
         raf = requestAnimationFrame(loop);
-        return () => {
-            clearTimeout(openT);
-            cancelAnimationFrame(raf);
-        };
-    }, [show, minDurationMs, prefersReducedMotion, phase, onDone]);
+        return () => cancelAnimationFrame(raf);
+    }, [show, hasStarted]);
 
-    useEffect(() => {
-        if (!show && visible && !exitingRef.current) {
-            exitingRef.current = true;
-            if (!prefersReducedMotion) {
-                setContentScale(0.985);
-                setContentBlur(4);
-            }
-            setOpacity(0);
-            const t = setTimeout(() => {
-                onDone?.();
-                setVisible(false);
-                exitingRef.current = false;
-            }, prefersReducedMotion ? 0 : 220);
-            return () => clearTimeout(t);
-        }
-    }, [show, visible, prefersReducedMotion, onDone]);
+    const handleInitiate = () => {
+        if (hasStarted) return;
+        
+        startTimeRef.current = performance.now(); // Marca o início do tempo real
+        const audio = new Audio(TIMELINE.AUDIO_SRC);
+        audioRef.current = audio;
+        
+        audio.play().then(() => {
+            isAudioPlaying.current = true;
+            setHasStarted(true);
+        }).catch(err => {
+            console.warn("Áudio não pôde tocar. Seguindo visualmente.", err);
+            isAudioPlaying.current = false;
+            setHasStarted(true); 
+        });
+    };
 
     if (!visible) return null;
 
     const zhPhrase =
-        phase >= 4 || phase === 3
-            ? "世界之希望已诞生"
-            : phase === 2
-                ? "日月星辰皆为吾家"
-                : phase === 1
-                    ? "万物归一"
-                    : "";
+        phase >= 4 ? "世界之希望已诞生"
+            : phase >= 3 ? "日月星辰皆为吾家"
+            : phase >= 1 ? "万物归一"
+            : "";
 
     return (
-        <div
-            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black transition-opacity duration-300"
-            style={{ opacity }}
-            role="status"
-            aria-label="Carregando"
-        >
-            <div
-                className="flex flex-col items-center justify-center px-6 transition-[transform,filter] duration-300"
-                style={{
-                    transform: `scale(${contentScale})`,
-                    filter: contentBlur ? `blur(${contentBlur}px)` : "none",
-                }}
-            >
-                {/* Logo */}
-                <Image
-                    src={logoSrc}
-                    alt="Zaeon"
-                    width={100}
-                    height={100}
-                    priority
-                    className="mb-6 opacity-95"
-                />
-
-                {/* Barra de progresso */}
-                <div className="w-[200px] h-[3px] rounded-full bg-white/15 overflow-hidden">
-                    <div
-                        className="h-full rounded-full"
-                        style={{
-                            width: `${Math.max(0.02, progress) * 100}%`,
-                            transition: prefersReducedMotion
-                                ? "none"
-                                : "width 120ms cubic-bezier(.22,.61,.36,1)",
-                            background:
-                                "linear-gradient(90deg,rgba(255,255,255,.9),rgba(230,236,255,.95),rgba(255,255,255,.9))",
-                            boxShadow: "0 0 8px rgba(255,255,255,0.35)",
-                            transform: "translateZ(0)",
-                            willChange: "width",
-                        }}
-                    />
-                </div>
-
-                {/* Frase Mística */}
-                {zhPhrase && (
-                    <div
-                        className="mt-8 text-center text-[8px] tracking-[0.4em] leading-none text-sky-400/60 font-thin uppercase"
-                        style={{
-                            fontFamily: `"PingFang SC", "Noto Sans SC", "Helvetica Neue", sans-serif`,
-                            WebkitFontSmoothing: "antialiased",
-                        }}
-                        aria-hidden="true"
-                    >
-                        {zhPhrase}
-                    </div>
-                )}
-
-                {/* Logs técnicos */}
-                <div
-                    className="mt-4 text-center text-[9px] leading-tight text-white/60"
-                    style={{
-                        fontFamily:
-                            `"Ubuntu Mono","SF Mono","Menlo","Consolas","Liberation Mono",monospace`,
-                    }}
-                    aria-live="polite"
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black transition-opacity duration-300" style={{ opacity }}>
+            <div className="flex flex-col items-center justify-center px-6">
+                
+                <button 
+                    onClick={handleInitiate}
+                    className={`flex flex-col items-center justify-center transition-all duration-300 ${!hasStarted ? "cursor-pointer hover:scale-105 hover:opacity-100 opacity-80" : "cursor-default opacity-95"}`}
+                    disabled={hasStarted}
                 >
-                    {phase >= 1 && <p>[ OK ] mounting zaeon kernel modules — 33%</p>}
-                    {phase >= 2 && <p>[ OK ] linking research graph services — 51%</p>}
-                    {phase >= 3 && <p>[ OK ] starting ai-mentors daemons — 69%</p>}
-                    {phase >= 4 && (
-                        <p className="pt-1 text-white/75 tracking-wide">
-                            zaeon state initiated.
-                        </p>
+                    <Image src={logoSrc} alt="Zaeon" width={100} height={100} priority className="mb-4" />
+                    {!hasStarted && <span className="text-white/80 tracking-[0.2em] text-xs font-medium animate-pulse">INITIATE ZAEON</span>}
+                </button>
+
+                <div className="h-[80px] flex flex-col items-center justify-start mt-6 w-full">
+                    {!hasStarted ? (
+                        <div className="text-center text-[10px] tracking-widest leading-tight text-sky-400/70 font-light mt-4">
+                            FOR A BETTER EXPERIENCE, USE HEADPHONES
+                        </div>
+                    ) : (
+                        <>
+                            <div className={`w-[200px] h-[3px] rounded-full bg-white/15 overflow-hidden transition-opacity duration-500 ${phase >= 1 ? 'opacity-100' : 'opacity-0'}`}>
+                                <div
+                                    ref={progressBarRef}
+                                    className="h-full rounded-full"
+                                    style={{
+                                        width: "0%",
+                                        background: "linear-gradient(90deg,rgba(255,255,255,.9),rgba(230,236,255,.95),rgba(255,255,255,.9))",
+                                        boxShadow: "0 0 8px rgba(255,255,255,0.35)",
+                                        transition: "none", 
+                                    }}
+                                />
+                            </div>
+
+                            {zhPhrase && (
+                                <div className="mt-6 text-center text-[10px] tracking-widest leading-tight text-sky-400/90 font-light">
+                                    {zhPhrase}
+                                </div>
+                            )}
+
+                            <div className="mt-4 text-center text-[9px] leading-tight text-white/60 space-y-1" style={{ fontFamily: `"Ubuntu Mono","SF Mono","Menlo","Consolas","Liberation Mono",monospace` }}>
+                                {phase >= 2 && <p>[ OK ] mounting zaeon kernel modules — <span ref={percentText1Ref}>0</span>%</p>}
+                                {phase >= 3 && <p>[ OK ] linking research graph services — <span ref={percentText2Ref}>40</span>%</p>}
+                                {phase >= 4 && (
+                                    <>
+                                        <p>[ OK ] starting ai-mentors daemons — <span ref={percentText3Ref}>75</span>%</p>
+                                        <p className="pt-2 text-white/80 tracking-wide font-medium animate-pulse">zaeon state initiated.</p>
+                                    </>
+                                )}
+                            </div>
+                        </>
                     )}
                 </div>
             </div>

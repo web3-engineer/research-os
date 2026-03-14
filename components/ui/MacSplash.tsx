@@ -3,14 +3,13 @@
 import Image, { type StaticImageData } from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-// Definimos o caminho da imagem como uma constante (apontando para public/assets)
+// Definimos o caminho da imagem como uma constante
 const LOGO_DEFAULT = "/assets/zaeon-brain.png";
 
 type Props = {
     show?: boolean;
     onDone?: () => void;
     minDurationMs?: number;
-    // Aceita tanto o caminho (string) quanto um import estático
     logoSrc?: StaticImageData | string;
     hint?: string;
 };
@@ -19,8 +18,9 @@ export default function MacSplash({
     show = true,
     onDone,
     minDurationMs = 3000,
-    logoSrc = LOGO_DEFAULT, // Agora usa a constante definida acima
+    logoSrc = LOGO_DEFAULT,
 }: Props) {
+    const [hasStarted, setHasStarted] = useState(false); // NOVO: Controla se o usuário já clicou
     const [progress, setProgress] = useState(0);
     const [phase, setPhase] = useState<0 | 1 | 2 | 3 | 4>(0);
     const [visible, setVisible] = useState(show);
@@ -39,16 +39,22 @@ export default function MacSplash({
 
     const ease = (t: number) => 1 - Math.pow(1 - t, 3);
 
+    // Efeito 1: Lida apenas com a aparição inicial da tela (Fade In)
     useEffect(() => {
         if (!show) return;
-
         setVisible(true);
         const openT = setTimeout(() => setOpacity(1), 10);
-
+        
         if (typeof window !== "undefined") {
             window.history.scrollRestoration = "manual";
             window.scrollTo(0, 0);
         }
+        return () => clearTimeout(openT);
+    }, [show]);
+
+    // Efeito 2: A animação de loading, que SÓ RODA se hasStarted for true
+    useEffect(() => {
+        if (!show || !hasStarted) return; // Barra segura o carregamento aqui
 
         let raf = 0;
         const loop = (ts: number) => {
@@ -95,12 +101,10 @@ export default function MacSplash({
         };
 
         raf = requestAnimationFrame(loop);
-        return () => {
-            clearTimeout(openT);
-            cancelAnimationFrame(raf);
-        };
-    }, [show, minDurationMs, prefersReducedMotion, phase, onDone]);
+        return () => cancelAnimationFrame(raf);
+    }, [show, hasStarted, minDurationMs, prefersReducedMotion, phase, onDone]);
 
+    // Efeito 3: Lida com a saída forçada caso a prop 'show' mude
     useEffect(() => {
         if (!show && visible && !exitingRef.current) {
             exitingRef.current = true;
@@ -117,6 +121,18 @@ export default function MacSplash({
             return () => clearTimeout(t);
         }
     }, [show, visible, prefersReducedMotion, onDone]);
+
+    // Função disparada no clique da logo
+    const handleInitiate = () => {
+        if (hasStarted) return;
+        
+        // 1. Toca o som de boot/música (substitua o caminho pelo seu arquivo)
+        const audio = new Audio("/assets/boot-music.mp3");
+        audio.play().catch(err => console.error("Erro ao reproduzir áudio:", err));
+
+        // 2. Inicia o carregamento visual
+        setHasStarted(true);
+    };
 
     if (!visible) return null;
 
@@ -143,60 +159,90 @@ export default function MacSplash({
                     filter: contentBlur ? `blur(${contentBlur}px)` : "none",
                 }}
             >
-                {/* Logo - Agora carregando via path de public */}
-                <Image
-                    src={logoSrc}
-                    alt="Zaeon"
-                    width={100}
-                    height={100}
-                    priority
-                    className="mb-6 opacity-95"
-                />
-
-                <div className="w-[200px] h-[3px] rounded-full bg-white/15 overflow-hidden">
-                    <div
-                        className="h-full rounded-full"
-                        style={{
-                            width: `${Math.max(0.02, progress) * 100}%`,
-                            transition: prefersReducedMotion
-                                ? "none"
-                                : "width 120ms cubic-bezier(.22,.61,.36,1)",
-                            background:
-                                "linear-gradient(90deg,rgba(255,255,255,.9),rgba(230,236,255,.95),rgba(255,255,255,.9))",
-                            boxShadow: "0 0 8px rgba(255,255,255,0.35)",
-                            transform: "translateZ(0)",
-                            willChange: "width",
-                        }}
-                    />
-                </div>
-
-                {zhPhrase && (
-                    <div
-                        className="mt-6 text-center text-[10px] tracking-widest leading-tight text-sky-400/90 font-light"
-                        style={{
-                            fontFamily: `"Noto Sans SC", "Microsoft YaHei", sans-serif`,
-                        }}
-                        aria-hidden="true"
-                    >
-                        {zhPhrase}
-                    </div>
-                )}
-
-                <div
-                    className="mt-4 text-center text-[9px] leading-tight text-white/60"
-                    style={{
-                        fontFamily:
-                            `"Ubuntu Mono","SF Mono","Menlo","Consolas","Liberation Mono",monospace`,
-                    }}
-                    aria-live="polite"
+                {/* Logo transformado em botão de ignição antes de iniciar */}
+                <button 
+                    onClick={handleInitiate}
+                    className={`flex flex-col items-center justify-center transition-all duration-300 ${
+                        !hasStarted 
+                            ? "cursor-pointer hover:scale-105 hover:opacity-100 opacity-80" 
+                            : "cursor-default opacity-95"
+                    }`}
+                    disabled={hasStarted}
                 >
-                    {phase >= 1 && <p>[ OK ] mounting zaeon kernel modules — 33%</p>}
-                    {phase >= 2 && <p>[ OK ] linking research graph services — 51%</p>}
-                    {phase >= 3 && <p>[ OK ] starting ai-mentors daemons — 69%</p>}
-                    {phase >= 4 && (
-                        <p className="pt-1 text-white/75 tracking-wide">
-                            zaeon state initiated.
-                        </p>
+                    <Image
+                        src={logoSrc}
+                        alt="Zaeon"
+                        width={100}
+                        height={100}
+                        priority
+                        className="mb-4"
+                    />
+                    
+                    {!hasStarted && (
+                        <span className="text-white/80 tracking-[0.2em] text-xs font-medium animate-pulse">
+                            INITIATE ZAEON
+                        </span>
+                    )}
+                </button>
+
+                {/* Container que altera entre o aviso dos fones e a barra de carregamento */}
+                <div className="h-[60px] flex flex-col items-center justify-start mt-6 w-full">
+                    {!hasStarted ? (
+                        <div className="text-center text-[10px] tracking-widest leading-tight text-sky-400/70 font-light mt-4">
+                            FOR A BETTER EXPERIENCE, USE HEADPHONES
+                        </div>
+                    ) : (
+                        <>
+                            {/* Barra de Progresso */}
+                            <div className="w-[200px] h-[3px] rounded-full bg-white/15 overflow-hidden">
+                                <div
+                                    className="h-full rounded-full"
+                                    style={{
+                                        width: `${Math.max(0.02, progress) * 100}%`,
+                                        transition: prefersReducedMotion
+                                            ? "none"
+                                            : "width 120ms cubic-bezier(.22,.61,.36,1)",
+                                        background:
+                                            "linear-gradient(90deg,rgba(255,255,255,.9),rgba(230,236,255,.95),rgba(255,255,255,.9))",
+                                        boxShadow: "0 0 8px rgba(255,255,255,0.35)",
+                                        transform: "translateZ(0)",
+                                        willChange: "width",
+                                    }}
+                                />
+                            </div>
+
+                            {/* Frase em Mandarim */}
+                            {zhPhrase && (
+                                <div
+                                    className="mt-6 text-center text-[10px] tracking-widest leading-tight text-sky-400/90 font-light"
+                                    style={{
+                                        fontFamily: `"Noto Sans SC", "Microsoft YaHei", sans-serif`,
+                                    }}
+                                    aria-hidden="true"
+                                >
+                                    {zhPhrase}
+                                </div>
+                            )}
+
+                            {/* Logs do Terminal */}
+                            <div
+                                className="mt-4 text-center text-[9px] leading-tight text-white/60"
+                                style={{
+                                    fontFamily:
+                                        `"Ubuntu Mono","SF Mono","Menlo","Consolas","Liberation Mono",monospace`,
+                                }}
+                                aria-live="polite"
+                            >
+                                {phase >= 1 && <p>[ OK ] mounting zaeon kernel modules — 33%</p>}
+                                {phase >= 2 && <p>[ OK ] linking research graph services — 51%</p>}
+                                {phase >= 3 && <p>[ OK ] starting ai-mentors daemons — 69%</p>}
+                                {phase >= 4 && (
+                                    <p className="pt-1 text-white/75 tracking-wide">
+                                        zaeon state initiated.
+                                    </p>
+                                )}
+                            </div>
+                        </>
                     )}
                 </div>
             </div>

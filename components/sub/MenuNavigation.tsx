@@ -10,7 +10,6 @@ import { useTranslation } from "react-i18next";
 import { signIn, signOut, useSession } from "next-auth/react";
 import dynamic from "next/dynamic";
 
-// IMPORTANTE: Certifique-se que o caminho aqui aponta para o arquivo do MODAL que criamos
 const OnboardModal = dynamic(() => import("@/components/main/OnboardModal"), { ssr: false });
 
 const MENU_ITEMS = [
@@ -20,7 +19,6 @@ const MENU_ITEMS = [
   { labelKey: "menu.manual", href: "/workstation/admin" },
 ];
 
-// LISTA DE ROLES (Sem Cyber Hall)
 const ROLES = [
   { slug: "student", key: "roles.student" },
   { slug: "researcher", key: "roles.researcher" },
@@ -36,7 +34,7 @@ export default function MenuNavigation() {
   const [index, setIndex] = useState(0);
   const [roleIndex, setRoleIndex] = useState(0); 
   const [pickerOpen, setPickerOpen] = useState(false); 
-  const [onboardOpen, setOnboardOpen] = useState(false); // Controla o Modal
+  const [onboardOpen, setOnboardOpen] = useState(false);
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
 
   const isLoggedIn = status === "authenticated";
@@ -47,63 +45,58 @@ export default function MenuNavigation() {
     return true;
   });
 
-  // Ajustado para usar o tom de azul (cyan-900/20) em ambos os modos
-  const panelClass = "w-full mt-24 rounded-3xl overflow-hidden backdrop-blur-xl transition-all duration-500 bg-cyan-900/20 border border-cyan-400/30 shadow-2xl flex flex-col";
+  // --- CLASSES ESTILO APPLE GLASS REFINADO ---
+  const panelClass = "w-full mt-24 rounded-[32px] overflow-hidden backdrop-blur-2xl transition-all duration-500 bg-cyan-950/10 border border-white/10 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] flex flex-col";
   
-  // Ajustado para usar cyan-950/30 (o tom azul escuro e transparente) como base
-  const cardBase = "group relative overflow-hidden flex items-center justify-between rounded-xl px-5 min-h-[64px] w-full transition-all duration-300 cursor-pointer font-bold text-white bg-cyan-950/30 hover:bg-cyan-900/40 border border-white/5 hover:border-cyan-400/20 hover:scale-[1.01]";
+  // Reduzi a min-h de 64px para 52px e o padding lateral
+  const cardBase = "group relative overflow-hidden flex items-center justify-between rounded-2xl px-4 min-h-[52px] w-full transition-all duration-300 cursor-pointer font-medium text-slate-950 dark:text-white bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-cyan-400/30";
   
-  const cardSelected = "ring-1 ring-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.3)] bg-cyan-900/40";
-  const accentBar = (active: boolean) => `absolute left-0 top-0 h-full w-[4px] transition-all duration-300 ${active ? "bg-cyan-400 opacity-100" : "bg-transparent opacity-0"}`;
+  const cardSelected = "bg-cyan-400/10 border-cyan-400/40 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.15)]";
+  
+  // Barra de acento agora é flutuante e menor (estilo iOS)
+  const accentBar = (active: boolean) => `absolute left-1 top-1/2 -translate-y-1/2 h-6 w-[3px] rounded-full transition-all duration-500 ${active ? "bg-cyan-400 opacity-100 scale-y-100" : "bg-transparent opacity-0 scale-y-0"}`;
 
   return (
     <div className={panelClass}>
-      <nav className="px-4 sm:px-6 py-8 min-h-[350px] w-full flex flex-col">
+      <nav className="px-5 py-6 min-h-[320px] w-full flex flex-col justify-center">
         <AnimatePresence mode="wait">
           {!isOptionsOpen ? (
             <motion.ul 
               key="main" 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
-              exit={{ opacity: 0 }} 
-              className="flex flex-col gap-3 w-full"
+              initial={{ opacity: 0, y: 10 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              exit={{ opacity: 0, y: -10 }} 
+              className="flex flex-col gap-2 w-full" // Gap reduzido para colagem mais bonita
             >
               
-              {/* ITEM 0: NEW ACCOUNT / SELETOR */}
               <li className="w-full" onMouseEnter={() => setIndex(0)} onClick={() => !isLoggedIn && setPickerOpen(true)}>
                 <div className={`${cardBase} ${index === 0 ? cardSelected : ""}`}>
                   <div className={accentBar(index === 0)} />
-                  <span className="truncate pr-2 flex-1">{isLoggedIn ? `${session?.user?.name || 'User'} Lv.1` : t("menu.new")}</span>
+                  <span className="truncate pr-2 text-sm tracking-tight pl-2">
+                    {isLoggedIn ? `${session?.user?.name || 'User'} Lv.1` : t("menu.new")}
+                  </span>
                   
                   {!isLoggedIn && pickerOpen ? (
-                    <div className="flex items-center gap-2 bg-black/80 p-1 rounded-lg border border-white/10 shrink-0 z-20">
+                    <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md p-1 rounded-xl border border-white/10 shrink-0 z-20">
                       <ChevronLeftIcon 
-                        className="w-4 h-4 cursor-pointer hover:text-cyan-400 transition-colors" 
+                        className="w-3.5 h-3.5 cursor-pointer hover:text-cyan-400 transition-colors" 
                         onClick={(e) => { 
                           e.stopPropagation(); 
                           setRoleIndex(r => (r - 1 + ROLES.length) % ROLES.length); 
                         }} 
                       />
-                      
-                      <span 
-                        className="text-[11px] min-w-[110px] text-center uppercase tracking-tighter hover:text-cyan-400 cursor-pointer select-none" 
-                        onClick={(e) => {
-                            e.stopPropagation(); 
-                            setOnboardOpen(true); 
-                        }}
-                      >
+                      <span className="text-[10px] min-w-[90px] text-center uppercase font-bold tracking-widest select-none">
                         {t(ROLES[roleIndex].key)}
                       </span>
-                      
                       <ChevronRightIcon 
-                        className="w-4 h-4 cursor-pointer hover:text-cyan-400 transition-colors" 
+                        className="w-3.5 h-3.5 cursor-pointer hover:text-cyan-400 transition-colors" 
                         onClick={(e) => { 
                           e.stopPropagation(); 
                           setRoleIndex(r => (r + 1) % ROLES.length); 
                         }} 
                       />
                     </div>
-                  ) : <ChevronRightIcon className="h-5 w-5 opacity-40 shrink-0" />}
+                  ) : <ChevronRightIcon className="h-4 w-4 opacity-30 group-hover:opacity-100 transition-opacity" />}
                 </div>
               </li>
 
@@ -117,8 +110,8 @@ export default function MenuNavigation() {
                   }}>
                     <div className={`${cardBase} ${isSel ? cardSelected : ""}`}>
                       <div className={accentBar(isSel)} />
-                      <span className="truncate pr-2 flex-1">{t(item.labelKey)}</span>
-                      <ChevronRightIcon className="h-5 w-5 opacity-40 shrink-0" />
+                      <span className="truncate pr-2 text-sm tracking-tight pl-2">{t(item.labelKey)}</span>
+                      <ChevronRightIcon className="h-4 w-4 opacity-30 group-hover:opacity-100 transition-opacity" />
                     </div>
                   </li>
                 );
@@ -127,18 +120,21 @@ export default function MenuNavigation() {
           ) : (
             <motion.div 
               key="options" 
-              initial={{ x: 20, opacity: 0 }} 
+              initial={{ x: 10, opacity: 0 }} 
               animate={{ x: 0, opacity: 1 }} 
-              className="flex flex-col gap-4 w-full"
+              className="flex flex-col gap-3 w-full"
             >
-               <button onClick={() => setIsOptionsOpen(false)} className="flex items-center gap-2 text-cyan-400 text-xs font-bold uppercase mb-2 w-full">
-                 <ArrowLeftIcon className="w-4 h-4" /> {t("menu.back")}
+               <button 
+                  onClick={() => setIsOptionsOpen(false)} 
+                  className="flex items-center gap-2 text-cyan-400/80 hover:text-cyan-400 text-[10px] font-bold uppercase mb-2 ml-2 transition-colors"
+                >
+                 <ArrowLeftIcon className="w-3.5 h-3.5" /> {t("menu.back")}
                </button>
 
                <div className={cardBase}>
-                 <div className="flex flex-col flex-1">
-                   <span className="text-[10px] opacity-60 uppercase">{t("options.language")}</span>
-                   <span className="text-[15px]">{i18n.language.toUpperCase()}</span>
+                 <div className="flex flex-col flex-1 pl-2">
+                   <span className="text-[9px] opacity-50 uppercase font-bold tracking-tighter">{t("options.language")}</span>
+                   <span className="text-sm">{i18n.language.toUpperCase()}</span>
                  </div>
                  <select 
                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
@@ -150,25 +146,25 @@ export default function MenuNavigation() {
                    <option value="es">Español</option>
                    <option value="zh">中文</option>
                    <option value="ko">한국어</option>
-                   <option value="fr">Français</option>
-                   <option value="de">Deutsch</option>
                  </select>
-                 <ChevronRightIcon className="h-5 w-5 opacity-40 shrink-0" />
+                 <ChevronRightIcon className="h-4 w-4 opacity-30" />
                </div>
 
-               <div className={`${cardBase} hover:bg-red-500/10`} onClick={() => signOut()}>
-                 <div className="flex flex-col flex-1">
-                   <span className="text-[10px] opacity-60 uppercase">Session</span>
-                   <span className="text-[15px]">{t("menu.logout", "Disconnect")}</span>
+               <div className={`${cardBase} hover:bg-red-500/20 hover:border-red-500/40`} onClick={() => signOut()}>
+                 <div className="flex flex-col flex-1 pl-2">
+                   <span className="text-[9px] opacity-50 uppercase font-bold tracking-tighter">Session</span>
+                   <span className="text-sm">{t("menu.logout", "Disconnect")}</span>
                  </div>
-                 <ArrowRightStartOnRectangleIcon className="h-5 w-5 opacity-40 shrink-0" />
+                 <ArrowRightStartOnRectangleIcon className="h-4 w-4 opacity-30" />
                </div>
             </motion.div>
           )}
         </AnimatePresence>
       </nav>
       
-      <div className="px-6 pb-7 text-[11px] opacity-55 text-white tracking-widest">{t("footer.version")}</div>
+      <div className="px-8 pb-6 text-[10px] opacity-30 text-white tracking-[0.3em] font-light">
+        {t("footer.version")}
+      </div>
       
       {onboardOpen && (
         <OnboardModal 

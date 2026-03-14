@@ -6,7 +6,7 @@ import {
   Power, Send, Sparkles, X, AlertCircle, StickyNote,
   FileText, Plus, Database, Bot, File, Briefcase, Pen, Globe,
   Users, Layers, Share2, Copy, ArrowUpRight,
-  Hash, UploadCloud, Trash2, Check, Brain, Cpu
+  Hash, UploadCloud, Trash2, Check, Brain, Cpu, MessageSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSession } from 'next-auth/react';
@@ -448,7 +448,7 @@ export default function LessonsModule() {
 
     const [storedPdfs, setStoredPdfs] = useState<StoredDoc[]>([]);
     
-    // STATE - AI MODULES NO BACKPACK (Apenas 1 módulo inicial agora)
+    // STATE - AI MODULES NO BACKPACK
     const [userModules, setUserModules] = useState<UserModule[]>([
         { id: 1, title: "Personal Backpack", items: [] }
     ]);
@@ -456,24 +456,23 @@ export default function LessonsModule() {
     // REF PARA JANELAS FLUTUANTES (Re-Foco)
     const aiWindows = useRef<{ [key: string]: Window | null }>({});
     
-    // SERVIÇOS DE IA PARA O LAUNCHER MINIMALISTA
+    // SERVIÇOS DE IA PARA O LAUNCHER MINIMALISTA (Apontando para logos locais)
     const aiServices = [
         { 
             id: 'gpt', name: "ChatGPT", url: "https://chat.openai.com", color: "bg-[#10a37f]", 
-            logo: "https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg" 
+            logo: "/logos/chatgpt.png", fallbackIcon: MessageSquare 
         },
         { 
             id: 'claude', name: "Claude", url: "https://claude.ai", color: "bg-[#d97757]", 
-            logo: "https://cdn.simpleicons.org/anthropic/white" 
+            logo: "/logos/claude.png", fallbackIcon: Brain 
         },
         { 
             id: 'gemini', name: "Gemini", url: "https://gemini.google.com", color: "bg-[#1d4ed8]", 
-            logo: "https://cdn.simpleicons.org/googlegemini/white" 
+            logo: "/logos/gemini.png", fallbackIcon: Sparkles 
         },
         { 
             id: 'qwen', name: "Qwen", url: "https://chat.qwenlm.ai", color: "bg-[#6366f1]", 
-            logo: "/logos/qwen.png", // Imagem local que vai adicionar
-            fallbackIcon: Brain 
+            logo: "/logos/qwen.png", fallbackIcon: Cpu 
         } 
     ];
 
@@ -485,7 +484,7 @@ export default function LessonsModule() {
         if (zaeonChatScrollRef.current) zaeonChatScrollRef.current.scrollTop = zaeonChatScrollRef.current.scrollHeight;
     }, [liquidChatHistory]);
 
-    // LOAD DATA
+    // LOAD DATA E TRANSIÇÃO MEIA NOITE
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const savedClasses = localStorage.getItem('zaeon_schedule_data');
@@ -505,7 +504,6 @@ export default function LessonsModule() {
             if (savedLiquidChat) setLiquidChatHistory(JSON.parse(savedLiquidChat));
             if (savedDocs) setStoredPdfs(JSON.parse(savedDocs));
             
-            // Segurança: Garante que a mochila carrega limpa, sem o "Project Archives"
             if (savedModules) {
                 const parsedModules = JSON.parse(savedModules).filter((m: any) => m.id !== 2);
                 setUserModules(parsedModules.length > 0 ? parsedModules : [{ id: 1, title: "Personal Backpack", items: [] }]);
@@ -515,7 +513,22 @@ export default function LessonsModule() {
         }
     }, []);
 
-    // SAVE DATA: Nuvem e Local
+    // LÓGICA DE TRANSIÇÃO DA MEIA-NOITE PARA O GADGET DA AGENDA
+    useEffect(() => {
+        if (pluggedDay !== null) {
+            const midnightChecker = setInterval(() => {
+                const realToday = (new Date().getDay() + 6) % 7; // Ajuste para segunda-feira ser 0
+                if (pluggedDay !== realToday) {
+                    setPluggedDay(realToday); // O gadget pula automaticamente para a coluna do novo dia
+                }
+            }, 60000); // Checa a cada minuto
+            
+            return () => clearInterval(midnightChecker);
+        }
+    }, [pluggedDay]);
+
+    // SAVE DATA
+// SAVE DATA: Nuvem e Local
     useEffect(() => {
         if (isDataLoaded) {
             localStorage.setItem('zaeon_schedule_data', JSON.stringify(classes));
@@ -526,12 +539,18 @@ export default function LessonsModule() {
             localStorage.setItem('zaeon_stored_pdfs', JSON.stringify(storedPdfs));
             localStorage.setItem('zaeon_user_modules', JSON.stringify(userModules));
 
-            if (session?.user?.email) {
+            // MUDA AQUI: Usa o ID da sessão, e não o e-mail
+            // Nota: O NextAuth pode não ter o ID diretamente em session.user dependendo da tua config.
+            // Geralmente fica em (session as any).user.id ou session.user.email (se o backend buscar pelo email).
+            
+            const userIdToSave = (session?.user as any)?.id; 
+
+            if (userIdToSave) {
                 fetch('/api/workspace', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        userId: session.user.email,
+                        userId: userIdToSave, // Agora envia um ObjectID válido
                         schedule: classes,
                         stickyNote: stickyText,
                         zaeonChat: liquidChatHistory,
@@ -543,7 +562,6 @@ export default function LessonsModule() {
             }
         }
     }, [classes, stickyText, pluggedDay, gadgetOn, liquidChatHistory, storedPdfs, userModules, isDataLoaded, session]);
-
     const handleBackgroundClick = () => {
         if (selectedClass?.isDraft) {
             setSelectedClass(null);
@@ -1058,7 +1076,7 @@ export default function LessonsModule() {
                             </div>
                         </div>
 
-                        {/* Barra AI Launcher Minimalista com Re-Foco */}
+                        {/* Barra AI Launcher Minimalista */}
                         <div className="pt-3 mt-auto flex items-center justify-between border-t border-slate-200/50 dark:border-white/10">
                             <div className="flex items-center gap-1.5">
                                 <Bot size={12} className="text-indigo-500" />
@@ -1075,7 +1093,7 @@ export default function LessonsModule() {
                                             const left = 50; 
                                             const top = 100;
 
-                                            // Lógica de RE-FOCO
+                                            // Lógica de RE-FOCO: Se já está aberta, apenas puxa para a frente
                                             if (aiWindows.current[ai.id] && !aiWindows.current[ai.id]?.closed) {
                                                 aiWindows.current[ai.id]?.focus();
                                             } else {
@@ -1086,13 +1104,13 @@ export default function LessonsModule() {
                                                 );
                                             }
                                         }}
-                                        className={`w-9 h-9 rounded-full ${ai.color} text-white flex items-center justify-center shadow-md hover:scale-110 hover:shadow-xl transition-all border border-white/20 overflow-hidden`}
-                                        title={`Launch ${ai.name}`}
+                                        className={`w-10 h-10 rounded-full ${ai.color} text-white flex items-center justify-center shadow-md hover:scale-110 hover:shadow-xl transition-all border border-white/20 overflow-hidden`}
+                                        title={`Launch & Focus ${ai.name}`}
                                     >
                                         {ai.logo ? (
-                                            <img src={ai.logo} alt={ai.name} className="w-5 h-5 object-contain invert opacity-90" onError={(e) => e.currentTarget.style.display='none'} />
+                                            <img src={ai.logo} alt={ai.name} className="w-6 h-6 object-contain invert opacity-90" onError={(e) => e.currentTarget.style.display='none'} />
                                         ) : (
-                                            ai.fallbackIcon && <ai.fallbackIcon size={14} strokeWidth={3} />
+                                            ai.fallbackIcon && <ai.fallbackIcon size={16} strokeWidth={3} />
                                         )}
                                     </button>
                                 ))}
@@ -1106,7 +1124,7 @@ export default function LessonsModule() {
             {/* COLLECTIVE BUILD ZONE */}
             <CollectiveZone classes={classes} currentUser={session?.user} dragConstraints={constraintsRef} />
 
-            {/* NEURAL EDITOR (Garantido no final) */}
+            {/* NEURAL EDITOR */}
             <CollabEditor dragConstraints={constraintsRef} />
 
         </div>

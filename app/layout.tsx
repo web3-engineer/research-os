@@ -11,6 +11,9 @@ import { ThemeProvider } from "./providers";
 // 1. IMPORT THE WEB3 PROVIDER
 import { Web3Provider } from "@/src/context/Web3Context";
 
+// --- NOVO: COMPONENTE DE SOM GLOBAL ---
+import GlobalClickSound from "@/components/main/GlobalClickSound";
+
 import "../src/i18n";
 import "./globals.css";
 
@@ -50,6 +53,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                     "font-sans"
                 )}
             >
+                {/* Injetamos o som aqui para que ele escute os eventos de clique 
+                  em qualquer lugar da aplicação (acima de todos os providers).
+                */}
+                <GlobalClickSound />
+
                 <ThemeProvider
                     attribute="class"
                     defaultTheme="dark"
