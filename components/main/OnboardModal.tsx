@@ -188,13 +188,13 @@ const ZaeonAuthModal = ({ isOpen, onClose, role }: ZaeonAuthModalProps) => {
                                             <label className="text-[9px] text-gray-500 uppercase font-bold tracking-wider ml-1">Full Name</label>
                                             <div className="flex items-center bg-gray-50 dark:bg-black/30 rounded-lg border border-gray-200 px-3 py-1">
                                                 <User size={14} className="text-gray-400" />
-                                                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Subject Name" className="w-full bg-transparent border-none text-sm p-2 focus:ring-0 text-gray-900 dark:text-gray-200" />
+                                                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Subject Name" className="w-full bg-transparent border-none text-sm p-2 focus:ring-0 text-gray-900 dark:text-gray-200 outline-none" />
                                             </div>
                                         </div>
                                         <div className="flex gap-4">
                                             <div className="flex-1">
                                                 <label className="text-[9px] text-gray-500 uppercase font-bold tracking-wider ml-1">Age Cycle</label>
-                                                <div className="flex items-center justify-between bg-gray-100 dark:bg-[#0f172a] rounded-lg border p-1 h-11">
+                                                <div className="flex items-center justify-between bg-gray-100 dark:bg-[#0f172a] rounded-lg border p-1 h-11 border-gray-200 dark:border-white/10">
                                                     <button onClick={() => setAge(a => Math.max(1, a - 1))} className="px-2 text-gray-500"><ChevronDown size={14} /></button>
                                                     <span className="font-mono text-lg font-bold text-blue-600 dark:text-blue-400">{age}</span>
                                                     <button onClick={() => setAge(a => a + 1)} className="px-2 text-gray-500"><ChevronUp size={14} /></button>
@@ -202,7 +202,7 @@ const ZaeonAuthModal = ({ isOpen, onClose, role }: ZaeonAuthModalProps) => {
                                             </div>
                                             <div className="flex-1">
                                                 <label className="text-[9px] text-gray-500 uppercase font-bold tracking-wider ml-1">Biometrics</label>
-                                                <div className="relative flex h-11 bg-gray-100 dark:bg-[#0f172a] rounded-lg p-1 border cursor-pointer">
+                                                <div className="relative flex h-11 bg-gray-100 dark:bg-[#0f172a] rounded-lg p-1 border cursor-pointer border-gray-200 dark:border-white/10">
                                                     <motion.div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-md transition-all ${gender === 'male' ? 'bg-blue-500' : 'bg-pink-500 left-[50%]'}`} />
                                                     <button onClick={() => setGender('male')} className="flex-1 z-10 flex justify-center"><Mars size={16} className={gender === 'male' ? 'text-white' : 'text-gray-500'} /></button>
                                                     <button onClick={() => setGender('female')} className="flex-1 z-10 flex justify-center"><Venus size={16} className={gender === 'female' ? 'text-white' : 'text-gray-500'} /></button>
@@ -213,19 +213,19 @@ const ZaeonAuthModal = ({ isOpen, onClose, role }: ZaeonAuthModalProps) => {
                                 </motion.div>
 
                                 {/* ÁREA */}
-                                <motion.div drag dragConstraints={{ left: -30, right: 30 }} className="relative z-20 w-full bg-white dark:bg-[#1e293b] rounded-xl p-5 border border-gray-100 shadow-lg">
+                                <motion.div drag dragConstraints={{ left: -30, right: 30 }} className="relative z-20 w-full bg-white dark:bg-[#1e293b] rounded-xl p-5 border border-gray-100 dark:border-white/10 shadow-lg">
                                     <StringLine height={40} />
                                     <div className="flex items-center gap-2 mb-2">
                                         <BookOpen size={14} className="text-purple-500" />
                                         <span className="text-[9px] uppercase tracking-widest text-gray-500 font-bold">Knowledge Base</span>
                                     </div>
-                                    <input type="text" value={studyArea} onChange={(e) => setStudyArea(e.target.value)} placeholder="Ex: Software Engineering" className="w-full bg-gray-50 dark:bg-black/30 border border-gray-200 rounded px-3 py-2 text-xs focus:ring-purple-500" />
+                                    <input type="text" value={studyArea} onChange={(e) => setStudyArea(e.target.value)} placeholder="Ex: Software Engineering" className="w-full bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded px-3 py-2 text-xs focus:border-purple-500 outline-none text-slate-800 dark:text-white" />
                                 </motion.div>
                             </div>
 
                             {/* FOOTER BOTÃO GOOGLE */}
                             <div className="absolute bottom-6 w-full px-12 z-50">
-                                <button onClick={handleInitialize} disabled={!isReadyToSign} className={`w-full relative group font-bold py-3 rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 border ${isReadyToSign ? 'bg-white text-black hover:scale-[1.02]' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}>
+                                <button onClick={handleInitialize} disabled={!isReadyToSign} className={`w-full relative group font-bold py-3 rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 border ${isReadyToSign ? 'bg-white text-black hover:scale-[1.02] border-gray-200' : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 border-transparent cursor-not-allowed'}`}>
                                     {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <Image src="https://authjs.dev/img/providers/google.svg" alt="G" width={20} height={20} />}
                                     <span className="text-sm">Sign in with Google</span>
                                 </button>
@@ -233,26 +233,36 @@ const ZaeonAuthModal = ({ isOpen, onClose, role }: ZaeonAuthModalProps) => {
                         </div>
 
                         {/* --- LADO DIREITO (PREVIEW CARD) --- */}
-                        <div {...getTorsoProps()} className="relative hidden md:block border-l border-white/50 h-full overflow-hidden bg-gray-100 dark:bg-[#0b121f] group cursor-pointer">
+                        <div {...getTorsoProps()} className="relative hidden md:block border-l border-white/50 h-full overflow-hidden bg-gray-200/50 dark:bg-[#080d16] group cursor-pointer">
                             <input {...getTorsoInput()} />
-                            <Image src={torsoImage || "/assets/computer.png"} alt="Torso" fill className="object-cover transition-all duration-700 group-hover:scale-105" priority />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-80" />
+                            
+                            {/* Placeholder / Torso Image Container */}
+                            {torsoImage ? (
+                                <Image src={torsoImage} alt="Torso" fill className="object-cover transition-all duration-700 group-hover:scale-105" priority />
+                            ) : (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 dark:text-white/20 bg-gradient-to-br from-transparent to-slate-300/20 dark:to-cyan-900/10">
+                                    <ImageIcon size={48} className="mb-4 opacity-50 drop-shadow-md" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest bg-white/50 dark:bg-black/30 px-4 py-2 rounded-full border border-white/40 dark:border-white/10 backdrop-blur-sm">Drop Cover Photo</span>
+                                </div>
+                            )}
+
+                            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-80 pointer-events-none" />
 
                             {/* FACE CIRCLE */}
-                            <div {...getProfileProps()} className="absolute top-[15%] right-[28%] z-30 w-32 h-32 rounded-full border-2 border-blue-400 bg-blue-50/80 dark:bg-blue-900/50 backdrop-blur-md flex flex-col items-center justify-center text-center p-2 shadow-2xl group/circle cursor-pointer overflow-visible">
+                            <div {...getProfileProps()} className="absolute top-[15%] right-[28%] z-30 w-32 h-32 rounded-full border-2 border-blue-400 bg-blue-50/80 dark:bg-blue-900/50 backdrop-blur-md flex flex-col items-center justify-center text-center p-2 shadow-2xl group/circle cursor-pointer overflow-visible hover:scale-105 transition-transform">
                                 <input {...getProfileInput()} />
                                 {profileImage ? (
                                     <Image src={profileImage} alt="Profile" fill className="object-cover rounded-full" />
                                 ) : (
-                                    <div className="flex flex-col items-center">
+                                    <div className="flex flex-col items-center pointer-events-none">
                                         <Upload size={20} className="text-blue-500 mb-1" />
                                         <span className="text-[9px] font-bold text-blue-600 dark:text-blue-300 uppercase">Upload Face</span>
                                     </div>
                                 )}
-                                <div className="absolute -bottom-3 bg-blue-600 p-1.5 rounded-full shadow-lg border-2 border-white/20"><Upload size={14} className="text-white" /></div>
+                                <div className="absolute -bottom-3 bg-blue-600 p-1.5 rounded-full shadow-lg border-2 border-white/20 pointer-events-none"><Upload size={14} className="text-white" /></div>
                             </div>
 
-                            <div className="absolute bottom-10 left-8 right-8 text-white z-10">
+                            <div className="absolute bottom-10 left-8 right-8 text-white z-10 pointer-events-none">
                                 <div className="inline-block px-2 py-1 bg-green-500/20 border border-green-500/30 rounded text-[10px] text-green-400 font-mono mb-2 backdrop-blur-md">
                                     SYSTEM: {(studyArea || role).toUpperCase()}_MODE
                                 </div>

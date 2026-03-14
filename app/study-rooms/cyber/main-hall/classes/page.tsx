@@ -6,7 +6,7 @@ import {
   Power, Send, Sparkles, X, AlertCircle, StickyNote,
   FileText, Plus, Database, Bot, File, Briefcase, Pen, Globe,
   Users, Layers, Share2, Copy, ArrowUpRight,
-  Hash, UploadCloud, Trash2, Check, Brain, Cpu
+  Hash, UploadCloud, Trash2, Check, Brain, Cpu, Puzzle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSession } from 'next-auth/react';
@@ -696,9 +696,9 @@ export default function LessonsModule() {
         const isNearBottom = dropY > agendaRect.bottom - 80 && dropY < agendaRect.bottom + 50;
 
         if (isNearBottom && info.point.x > agendaRect.left && info.point.x < agendaRect.right) {
-            const colWidth = agendaRect.width / 5;
+            const colWidth = agendaRect.width / 7; // Ajustado para 7 dias
             const colIndex = Math.floor((info.point.x - agendaRect.left) / colWidth);
-            if (colIndex >= 0 && colIndex <= 4) {
+            if (colIndex >= 0 && colIndex <= 6) { // Aceita índices 0 até 6 (Seg a Dom)
                 const realToday = (new Date().getDay() + 6) % 7; 
                 setPluggedDay(realToday); 
                 setSelectedClass(null);
@@ -754,7 +754,13 @@ export default function LessonsModule() {
         }
     };
 
-    const days = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+    // Nova função: Deletar arquivo de PDF da Library
+    const handleDeletePdf = (id: string) => {
+        setStoredPdfs(prev => prev.filter(pdf => pdf.id !== id));
+    };
+
+    // Agora com Sábado e Domingo inclusos
+    const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
     const minHour = 6;
     const maxHour = 22;
     const totalHours = maxHour - minHour;
@@ -764,13 +770,13 @@ export default function LessonsModule() {
         <div ref={constraintsRef} onClick={handleBackgroundClick} className="relative min-h-screen w-full flex flex-col items-center p-8 bg-transparent font-sans selection:bg-cyan-500/30 text-slate-900 dark:text-white transition-colors duration-500 overflow-x-hidden">
             <div className="h-10 pointer-events-none"></div>
 
-            <div className="flex justify-center items-start gap-6 flex-wrap z-20 relative w-full pb-10 min-h-[400px]">
+            <div className="flex justify-start items-start gap-8 flex-wrap z-20 relative w-full max-w-[1400px] mx-auto pb-10 min-h-[400px]">
 
                 {/* REAL-TIME TRACKER MODULE */}
                 <RealTimeModule classes={classes} pluggedDay={pluggedDay} gadgetOn={gadgetOn} session={session} dragConstraints={constraintsRef} />
 
                 {/* SCHEDULE */}
-                <motion.div ref={agendaRef} drag dragConstraints={constraintsRef} className="group w-64 h-[380px] relative z-10" onClick={(e) => e.stopPropagation()}>
+                <motion.div ref={agendaRef} drag dragConstraints={constraintsRef} className="group w-[360px] h-[320px] relative z-10" onClick={(e) => e.stopPropagation()}>
                     <div className={`w-full h-full backdrop-blur-xl border border-white/10 p-5 rounded-[2.5rem] shadow-xl flex flex-col items-center justify-between relative overflow-hidden bg-[#172554]/90 dark:bg-black/40`}>
                         <div className="w-full flex justify-between items-center mb-2 pointer-events-none">
                             <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/60">Agenda</span>
@@ -1020,10 +1026,34 @@ export default function LessonsModule() {
                     </div>
 
                     <div className="flex flex-col gap-14 z-10">
-                        <div onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const files = Array.from(e.dataTransfer.files); const pdfs = files.filter(f => f.type === 'application/pdf').map(f => ({ id: Math.random().toString(36).substr(2, 9), title: f.name, type: 'pdf' as const, size: (f.size / 1024 / 1024).toFixed(1) + 'mb' })); setStoredPdfs(prev => [...prev, ...pdfs]); }} className="h-32 min-w-[150px] max-w-[450px] bg-white/70 dark:bg-black/60 backdrop-blur-3xl border border-white/40 dark:border-white/10 rounded-[1.8rem] p-4 flex flex-col relative shadow-2xl"><div className="flex items-center justify-between mb-3 border-b border-blue-200/50 dark:border-white/20 pb-2"><div className="flex items-center gap-2"><Database size={13} className="text-blue-600 dark:text-cyan-400" /><span className="text-[10px] font-black uppercase tracking-widest">Library</span></div></div><div className="flex gap-2 items-center h-full overflow-x-auto scrollbar-hide pr-2">{storedPdfs.map(pdf => (<motion.div key={pdf.id} className="group/item w-20 h-20 bg-blue-50/50 dark:bg-white/10 rounded-xl border border-blue-200/50 dark:border-white/20 flex flex-col items-center justify-center gap-0.5 p-2 relative"><FileText size={22} className="text-blue-600 dark:text-cyan-400" /><span className="text-[8px] text-slate-900 dark:text-white font-black truncate w-full block">{pdf.title}</span></motion.div>))}
-                            <label className="w-16 h-20 rounded-xl border-2 border-dashed border-blue-300/50 dark:border-white/30 flex items-center justify-center text-blue-400 dark:text-white hover:bg-blue-50 dark:hover:bg-white/10 hover:border-blue-500 cursor-pointer transition-all group/add shrink-0"><input type="file" className="hidden" accept=".pdf" onChange={handleLibraryUpload} /><Plus size={20} className="group-hover/add:scale-125 transition-transform" /></label>
-                        </div></div>
-                        <div className="h-32 min-w-[150px] max-w-[450px] bg-white/70 dark:bg-black/60 backdrop-blur-3xl border border-white/40 dark:border-white/10 rounded-[1.8rem] p-4 flex flex-col relative shadow-2xl"><div className="flex items-center justify-between mb-3 border-b border-purple-200/50 dark:border-white/20 pb-2"><div className="flex items-center gap-2"><Activity size={13} className="text-purple-600 dark:text-purple-400" /><span className="text-[10px] font-black uppercase tracking-widest">Fabricator</span></div></div></div>
+                        {/* LIBRARY MODULE */}
+                        <div onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const files = Array.from(e.dataTransfer.files); const pdfs = files.filter(f => f.type === 'application/pdf').map(f => ({ id: Math.random().toString(36).substr(2, 9), title: f.name, type: 'pdf' as const, size: (f.size / 1024 / 1024).toFixed(1) + 'mb' })); setStoredPdfs(prev => [...prev, ...pdfs]); }} className="h-32 min-w-[150px] max-w-[450px] bg-white/70 dark:bg-black/60 backdrop-blur-3xl border border-white/40 dark:border-white/10 rounded-[1.8rem] p-4 flex flex-col relative shadow-2xl">
+                            <div className="flex items-center justify-between mb-3 border-b border-blue-200/50 dark:border-white/20 pb-2">
+                                <div className="flex items-center gap-2"><Database size={13} className="text-blue-600 dark:text-cyan-400" /><span className="text-[10px] font-black uppercase tracking-widest">Library</span></div>
+                            </div>
+                            <div className="flex gap-2 items-center h-full overflow-x-auto scrollbar-hide pr-2">
+                                {storedPdfs.map(pdf => (
+                                    <motion.div key={pdf.id} className="group/item w-20 h-20 bg-blue-50/50 dark:bg-white/10 rounded-xl border border-blue-200/50 dark:border-white/20 flex flex-col items-center justify-center gap-0.5 p-2 relative">
+                                        <button onClick={(e) => { e.stopPropagation(); handleDeletePdf(pdf.id); }} className="absolute bottom-1 right-1 p-1 bg-red-500/80 hover:bg-red-600 text-white rounded-md opacity-0 group-hover/item:opacity-100 transition-opacity z-20">
+                                            <Trash2 size={10} />
+                                        </button>
+                                        <FileText size={22} className="text-blue-600 dark:text-cyan-400" />
+                                        <span className="text-[8px] text-slate-900 dark:text-white font-black truncate w-full block text-center">{pdf.title}</span>
+                                    </motion.div>
+                                ))}
+                                <label className="w-16 h-20 rounded-xl border-2 border-dashed border-blue-300/50 dark:border-white/30 flex items-center justify-center text-blue-400 dark:text-white hover:bg-blue-50 dark:hover:bg-white/10 hover:border-blue-500 cursor-pointer transition-all group/add shrink-0"><input type="file" className="hidden" accept=".pdf" onChange={handleLibraryUpload} /><Plus size={20} className="group-hover/add:scale-125 transition-transform" /></label>
+                            </div>
+                        </div>
+
+                        {/* PLUGINS MODULE (ANTIGO FABRICATOR) */}
+                        <div className="h-32 min-w-[150px] max-w-[450px] bg-white/70 dark:bg-black/60 backdrop-blur-3xl border border-white/40 dark:border-white/10 rounded-[1.8rem] p-4 flex flex-col relative shadow-2xl">
+                            <div className="flex items-center justify-between mb-3 border-b border-purple-200/50 dark:border-white/20 pb-2">
+                                <div className="flex items-center gap-2">
+                                    <Puzzle size={13} className="text-purple-600 dark:text-purple-400" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Plugins</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </motion.div>
             </div>
