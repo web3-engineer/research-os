@@ -5,167 +5,167 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslation } from "react-i18next";
-import { useSession } from "next-auth/react";
 import logoPng from "@/app/zaeon-name.png";
-
 import ThemeToggle from "@/components/sub/ThemeToggle";
 import "../../src/i18n";
 
 const TRACKS = [
+  "/assets/sounds/boot-track.mp3",
   "/assets/sounds/zaeon-theme-chill.mp3",
   "/assets/sounds/zaeon-theme-uplift.mp3"
 ];
 
+// --- SINGLETON GLOBAL ---
+let globalAudio: HTMLAudioElement | null = null;
+let globalAudioCtx: AudioContext | null = null;
+let globalAnalyser: AnalyserNode | null = null;
+let globalSource: MediaElementAudioSourceNode | null = null;
+
 const NUM_BARS = 12;
 
 export const Navbar = () => {
-  const { t } = useTranslation();
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
-
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [showTrackName, setShowTrackName] = useState(false);
 
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const barsRef = useRef<(HTMLDivElement | null)[]>([]);
-  
   const isPlayingRef = useRef(false);
 
-  useEffect(() => {
-    isPlayingRef.current = isPlaying;
-  }, [isPlaying]);
+  const isHome = pathname === "/";
 
-  // 1. INICIALIZAÇÃO DO AUDIO
+  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+
   useEffect(() => {
     setMounted(true);
-    if (!audioRef.current) {
-      audioRef.current = new Audio(TRACKS[0]);
-      audioRef.current.crossOrigin = "anonymous";
-      audioRef.current.volume = 0.25;
-      audioRef.current.loop = true;
-      audioRef.current.onended = () => handleNextTrack();
+    
+    if (typeof window !== "undefined" && !globalAudio) {
+      globalAudio = new Audio(TRACKS[0]);
+      globalAudio.crossOrigin = "anonymous";
+      globalAudio.volume = 0.4;
+      (window as any).zaeonAudio = globalAudio;
     }
-    return () => audioRef.current?.pause();
+
+    if (globalAudio && !globalAudio.paused && !isHome) {
+      setIsPlaying(true);
+      initAudioEngine();
+    }
   }, []);
 
-  // 2. MOTOR DE ÁUDIO (RESUME AUTOMÁTICO)
-  const initAudioEngine = async () => {
-    if (!audioRef.current) return;
+  // ==========================================
+  // O SEGREDO DO "AUTO-REWIND" ESTÁ AQUI
+  // ==========================================
+  useEffect(() => {
+    if (isHome && globalAudio) {
+      // Se voltou pra Home: Pausa, rebobina e prepara a faixa 0
+      globalAudio.pause();
+      globalAudio.currentTime = 0;
+      globalAudio.src = TRACKS[0];
+      setCurrentTrackIndex(0);
+      setIsPlaying(false);
+    }
+  }, [pathname]);
 
-    if (!audioCtxRef.current) {
+  // ESCUTA O COMANDO DE SYNC DO INTRO
+  useEffect(() => {
+    const handleMusicSync = () => {
+      if (globalAudio) {
+        setIsPlaying(true); 
+        initAudioEngine();
+      }
+    };
+    window.addEventListener("zaeon-music-sync", handleMusicSync);
+    return () => window.removeEventListener("zaeon-music-sync", handleMusicSync);
+  }, []);
+
+  const initAudioEngine = () => {
+    if (!globalAudio) return;
+    
+    if (!globalAudioCtx) {
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-      audioCtxRef.current = new AudioContext();
+      globalAudioCtx = new AudioContext();
     }
 
-    if (!sourceRef.current) {
-      analyserRef.current = audioCtxRef.current.createAnalyser();
-      analyserRef.current.fftSize = 128;
-      sourceRef.current = audioCtxRef.current.createMediaElementSource(audioRef.current);
-      sourceRef.current.connect(analyserRef.current);
-      analyserRef.current.connect(audioCtxRef.current.destination);
-      visualize();
+    if (!globalSource && globalAudioCtx) {
+      globalAnalyser = globalAudioCtx.createAnalyser();
+      globalAnalyser.fftSize = 128;
+      
+      try {
+        globalSource = globalAudioCtx.createMediaElementSource(globalAudio);
+        globalSource.connect(globalAnalyser);
+        globalAnalyser.connect(globalAudioCtx.destination);
+      } catch (err) {
+        console.warn("Fonte de áudio já conectada pelo navegador.");
+      }
     }
 
-    if (audioCtxRef.current.state === "suspended") {
-      await audioCtxRef.current.resume();
-    }
+    if (globalAudioCtx.state === "suspended") globalAudioCtx.resume();
+    visualize(); 
   };
 
-  // 3. LOGICA MESTRE: SEMPRE TOCAR NA HOME
-  useEffect(() => {
-    if (mounted && pathname === "/") {
-      const handleHomeEntry = async () => {
-        await initAudioEngine();
-        
-        // Se estiver pausado, força o play
-        if (audioRef.current && audioRef.current.paused) {
-          audioRef.current.play()
-            .then(() => setIsPlaying(true))
-            .catch((e) => console.log("Aguardando clique para iniciar som na Home..."));
-        }
-      };
-      
-      // Pequeno delay para garantir que a transição de página terminou
-      const timer = setTimeout(handleHomeEntry, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [pathname, mounted]);
-
   const visualize = () => {
-    if (!analyserRef.current) return;
-    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-    const idleHeights = [20, 40, 60, 30, 70, 40, 80, 25, 50, 30, 60, 20];
-
+    if (!globalAnalyser) return;
+    const dataArray = new Uint8Array(globalAnalyser.frequencyBinCount);
     const render = () => {
       requestAnimationFrame(render);
-      const playing = isPlayingRef.current;
-
-      barsRef.current.forEach((bar, i) => {
-        if (!bar) return;
-        if (playing && analyserRef.current) {
-          analyserRef.current.getByteFrequencyData(dataArray);
+      if (isPlayingRef.current && globalAnalyser) {
+        globalAnalyser.getByteFrequencyData(dataArray);
+        barsRef.current.forEach((bar, i) => {
+          if (!bar) return;
           const val = dataArray[i * 2] || 0;
           const h = Math.min(100, Math.max(15, (val / 255) * 100 * 1.5));
           bar.style.height = `${h}%`;
-          bar.style.opacity = "1";
-          bar.style.transition = "none";
-        } else {
-          bar.style.height = `${idleHeights[i % idleHeights.length]}%`;
-          bar.style.opacity = "0.4";
-          bar.style.transition = "height 0.8s ease-in-out";
-        }
-      });
+        });
+      }
     };
     render();
   };
 
-  const togglePlay = async () => {
-    if (!audioRef.current) return;
-    await initAudioEngine();
+  const togglePlay = () => {
+    if (!globalAudio) return;
+    initAudioEngine();
 
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current.play().then(() => setIsPlaying(true));
+    if (isPlaying) { 
+      globalAudio.pause(); 
+      setIsPlaying(false); 
+    } else { 
+      globalAudio.play().then(() => setIsPlaying(true)); 
     }
   };
 
   const handleNextTrack = () => {
-    if (!audioRef.current) return;
+    if (!globalAudio) return;
     const next = (currentTrackIndex + 1) % TRACKS.length;
     setCurrentTrackIndex(next);
-    audioRef.current.src = TRACKS[next];
-    if (isPlayingRef.current) audioRef.current.play();
+    globalAudio.src = TRACKS[next];
+    globalAudio.play();
+    setIsPlaying(true);
   };
 
   const handlePrevTrack = () => {
-    if (!audioRef.current) return;
+    if (!globalAudio) return;
     const prev = (currentTrackIndex - 1 + TRACKS.length) % TRACKS.length;
     setCurrentTrackIndex(prev);
-    audioRef.current.src = TRACKS[prev];
-    if (isPlayingRef.current) audioRef.current.play();
+    globalAudio.src = TRACKS[prev];
+    globalAudio.play();
+    setIsPlaying(true);
   };
 
   const getTrackName = () => TRACKS[currentTrackIndex].split('/').pop()?.replace('.mp3', '') || 'Track';
-  const checkActive = (path: string) => pathname.startsWith(path);
   const getLinkClassName = (path: string) => {
-    const active = checkActive(path);
-    return `transition-all duration-300 uppercase tracking-[0.2em] text-[10px] font-black ${active ? "text-cyan-500 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)] scale-110" : "text-foreground/50 hover:text-cyan-400"}`;
+    const active = pathname.startsWith(path);
+    return `transition-all uppercase tracking-[0.2em] text-[10px] font-black ${active ? "text-cyan-500 scale-110" : "text-foreground/50 hover:text-cyan-400"}`;
   };
 
   if (!mounted) return null;
 
   return (
-    <div className="w-full h-[90px] fixed top-0 z-[100] flex justify-center items-center pointer-events-none">
+    <div className="w-full h-[90px] fixed top-0 z-[100] flex justify-center items-center pointer-events-none font-sans">
       <div className="pointer-events-auto w-[96%] max-w-[1300px] h-[70px] rounded-[35px] backdrop-blur-xl bg-background/70 border border-foreground/10 shadow-2xl flex items-center justify-between px-8">
         
         <Link href="/" className="hover:scale-105 transition-transform">
-          <Image src={logoPng} alt="logo" width={220} height={100} priority className="h-10 w-auto object-contain invert dark:invert-0" />
+          <Image src={logoPng} alt="logo" width={220} height={100} priority className="h-10 w-auto invert dark:invert-0" />
         </Link>
 
         <nav className="hidden lg:flex items-center gap-10">
@@ -176,24 +176,19 @@ export const Navbar = () => {
         </nav>
 
         <div className="flex items-center gap-6">
-          <div className="flex items-center bg-foreground/5 dark:bg-white/5 backdrop-blur-2xl border border-foreground/10 dark:border-white/10 rounded-full px-4 py-2 transition-all">
+          <div className={`flex items-center bg-white/5 backdrop-blur-2xl border border-white/10 rounded-full px-4 py-2 transition-all`}>
             <div className="flex items-center gap-3 mr-4">
-              <button onClick={handlePrevTrack} className="text-foreground/40 hover:text-cyan-500 transition-colors text-xs">⏮</button>
-              <button onClick={togglePlay} className="text-foreground hover:text-cyan-500 transition-all text-xl w-6">
-                {isPlaying ? "⏸" : "▶"}
-              </button>
-              <button onClick={handleNextTrack} className="text-foreground/40 hover:text-cyan-500 transition-colors text-xs">⏭</button>
+              <button onClick={handlePrevTrack} className="text-foreground/40 hover:text-cyan-500">⏮</button>
+              <button onClick={togglePlay} className="text-foreground hover:text-cyan-500 text-xl w-6">{isPlaying ? "⏸" : "▶"}</button>
+              <button onClick={handleNextTrack} className="text-foreground/40 hover:text-cyan-500">⏭</button>
             </div>
-            <div className="w-[1px] h-4 bg-foreground/20 dark:bg-white/20 mr-4"></div>
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => setShowTrackName(!showTrackName)}>
               <div className="flex items-end gap-[3px] h-5 w-auto">
                 {Array.from({ length: NUM_BARS }).map((_, i) => (
-                  <div key={i} ref={(el) => { barsRef.current[i] = el; }} className="w-[3px] rounded-t-[1.5px] bg-cyan-500 shadow-[0_0_8px_rgba(34,211,238,0.4)]" style={{ height: '30%' }} />
+                  <div key={i} ref={(el) => { barsRef.current[i] = el; }} className="w-[2.5px] rounded-t-[1px] bg-cyan-500 shadow-[0_0_5px_rgba(34,211,238,0.4)]" style={{ height: '20%' }} />
                 ))}
               </div>
-              <div className={`overflow-hidden transition-all duration-500 ${showTrackName ? 'max-w-[150px] opacity-100' : 'max-w-0 opacity-0'}`}>
-                <span className="text-[10px] font-black tracking-tighter whitespace-nowrap text-cyan-600 dark:text-cyan-400 uppercase">{getTrackName()}</span>
-              </div>
+              {showTrackName && <span className="text-[9px] font-black text-cyan-400 uppercase tracking-tighter ml-2">{getTrackName()}</span>}
             </div>
           </div>
           <ThemeToggle />

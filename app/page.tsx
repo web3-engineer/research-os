@@ -9,7 +9,6 @@ import HeroPage from "@/components/sub/hero-content";
 import Encryption from "@/components/main/encryption";
 import StudyRoomsPage from "@/app/study-rooms/page";
 import IntroOverlay from "@/src/components/main/intro-overlay";
-import { Navbar } from "@/components/main/navbar";
 import { Footer } from "@/components/main/footer";
 
 const ParticleSystem = dynamic(
@@ -71,7 +70,7 @@ export default function Home() {
                 >
                     <ParticleSystem />
 
-                    {startContent && <Navbar />}
+                    {/* Navbar removida daqui, pois agora ela mora e persiste no layout.tsx */}
 
                     {/* CORREÇÃO DE LAYOUT: O pt-[110px] empurra a página pra baixo da Navbar */}
                     <div className="flex flex-col gap-20 pt-[110px] w-full">

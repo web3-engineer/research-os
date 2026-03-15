@@ -1,22 +1,17 @@
 "use client";
 
 import Image, { type StaticImageData } from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const LOGO_DEFAULT = "/assets/zaeon-brain.png";
 
-// ==========================================
-// CONFIGURAÇÃO DA LINHA DO TEMPO (Cravado em 7s)
-// Evolução a cada 1.8 segundos
-// ==========================================
 const TIMELINE = {
     AUDIO_SRC: "/assets/sounds/boot-track.mp3",
-    TOTAL_DURATION: 7.0, 
-    
-    STAGE_2_BAR_APPEARS: 0.1, // Barra surge instantaneamente
-    STAGE_3_MOD_1_START: 1.8, // Módulo 1
-    STAGE_4_MOD_2_START: 3.6, // Módulo 2 (1.8 * 2)
-    STAGE_5_MOD_3_START: 5.4, // Módulo 3 (1.8 * 3)
+    TOTAL_DURATION: 7.0,
+    STAGE_2_BAR_APPEARS: 0.1,
+    STAGE_3_MOD_1_START: 1.8,
+    STAGE_4_MOD_2_START: 3.6,
+    STAGE_5_MOD_3_START: 5.4,
 };
 
 type Props = {
@@ -25,11 +20,7 @@ type Props = {
     logoSrc?: StaticImageData | string;
 };
 
-export default function MacSplash({
-    show = true,
-    onDone,
-    logoSrc = LOGO_DEFAULT,
-}: Props) {
+export default function MacSplash({ show = true, onDone, logoSrc = LOGO_DEFAULT }: Props) {
     const [hasStarted, setHasStarted] = useState(false);
     const [phase, setPhase] = useState<0 | 1 | 2 | 3 | 4>(0);
     const [visible, setVisible] = useState(show);
@@ -40,17 +31,14 @@ export default function MacSplash({
     const percentText1Ref = useRef<HTMLSpanElement>(null);
     const percentText2Ref = useRef<HTMLSpanElement>(null);
     const percentText3Ref = useRef<HTMLSpanElement>(null);
-    
+
     const isAudioPlaying = useRef(false);
     const startTimeRef = useRef<number | null>(null);
-    
     const exitingRef = useRef(false);
     const phaseRef = useRef<0 | 1 | 2 | 3 | 4>(0);
 
     const onDoneRef = useRef(onDone);
-    useEffect(() => {
-        onDoneRef.current = onDone;
-    }, [onDone]);
+    useEffect(() => { onDoneRef.current = onDone; }, [onDone]);
 
     useEffect(() => {
         if (!show) return;
@@ -61,50 +49,35 @@ export default function MacSplash({
 
     useEffect(() => {
         if (!show || !hasStarted) return;
-
         let raf = 0;
-
         const loop = () => {
-            // Calcula o tempo base mesclando o áudio e o tempo real (evita travamentos)
             const realTimeElapsed = (performance.now() - (startTimeRef.current || performance.now())) / 1000;
-            const audioTime = (isAudioPlaying.current && audioRef.current && !audioRef.current.ended) 
-                ? audioRef.current.currentTime 
-                : realTimeElapsed;
-            
-            // Usa sempre o maior tempo para garantir que a UI não congele se o áudio falhar ou for mais curto
+            const audioTime = (isAudioPlaying.current && audioRef.current && !audioRef.current.ended)
+                ? audioRef.current.currentTime : realTimeElapsed;
             const time = Math.max(audioTime, realTimeElapsed);
 
             let currentGlobalPercent = 0;
-
             if (time >= TIMELINE.STAGE_5_MOD_3_START) {
                 if (phaseRef.current < 4) { phaseRef.current = 4; setPhase(4); }
-                const duration = TIMELINE.TOTAL_DURATION - TIMELINE.STAGE_5_MOD_3_START;
                 const elapsed = time - TIMELINE.STAGE_5_MOD_3_START;
-                currentGlobalPercent = 75 + Math.min((elapsed / duration) * 25, 25);
+                currentGlobalPercent = 75 + Math.min((elapsed / 1.6) * 25, 25);
                 if (percentText3Ref.current) percentText3Ref.current.innerText = Math.floor(currentGlobalPercent).toString();
-
             } else if (time >= TIMELINE.STAGE_4_MOD_2_START) {
                 if (phaseRef.current < 3) { phaseRef.current = 3; setPhase(3); }
-                const duration = TIMELINE.STAGE_5_MOD_3_START - TIMELINE.STAGE_4_MOD_2_START;
                 const elapsed = time - TIMELINE.STAGE_4_MOD_2_START;
-                currentGlobalPercent = 40 + Math.min((elapsed / duration) * 35, 35);
+                currentGlobalPercent = 40 + Math.min((elapsed / 1.8) * 35, 35);
                 if (percentText2Ref.current) percentText2Ref.current.innerText = Math.floor(currentGlobalPercent).toString();
-
             } else if (time >= TIMELINE.STAGE_3_MOD_1_START) {
                 if (phaseRef.current < 2) { phaseRef.current = 2; setPhase(2); }
-                const duration = TIMELINE.STAGE_4_MOD_2_START - TIMELINE.STAGE_3_MOD_1_START;
                 const elapsed = time - TIMELINE.STAGE_3_MOD_1_START;
-                currentGlobalPercent = Math.min((elapsed / duration) * 40, 40);
+                currentGlobalPercent = Math.min((elapsed / 1.8) * 40, 40);
                 if (percentText1Ref.current) percentText1Ref.current.innerText = Math.floor(currentGlobalPercent).toString();
-
             } else if (time >= TIMELINE.STAGE_2_BAR_APPEARS) {
                 if (phaseRef.current < 1) { phaseRef.current = 1; setPhase(1); }
-                currentGlobalPercent = 1; 
+                currentGlobalPercent = 1;
             }
 
-            if (progressBarRef.current) {
-                progressBarRef.current.style.width = `${Math.max(0, currentGlobalPercent)}%`;
-            }
+            if (progressBarRef.current) progressBarRef.current.style.width = `${currentGlobalPercent}%`;
 
             if (time < TIMELINE.TOTAL_DURATION && !exitingRef.current) {
                 raf = requestAnimationFrame(loop);
@@ -114,83 +87,60 @@ export default function MacSplash({
                 setTimeout(() => {
                     onDoneRef.current?.();
                     setVisible(false);
-                    if (audioRef.current) {
-                        audioRef.current.pause();
-                        audioRef.current.currentTime = 0;
-                    }
+                    // IMPORTANTE: Não matamos o áudio aqui, ele continua para a Home.
                 }, 300);
             }
         };
-
         raf = requestAnimationFrame(loop);
         return () => cancelAnimationFrame(raf);
     }, [show, hasStarted]);
 
     const handleInitiate = () => {
         if (hasStarted) return;
-        
-        startTimeRef.current = performance.now(); // Marca o início do tempo real
-        const audio = new Audio(TIMELINE.AUDIO_SRC);
-        audioRef.current = audio;
-        
-        audio.play().then(() => {
-            isAudioPlaying.current = true;
+
+        startTimeRef.current = performance.now();
+
+        // Tenta encontrar o áudio que a Navbar já preparou
+        const audio = (window as any).zaeonAudio;
+
+        if (audio) {
+            audio.play().then(() => {
+                isAudioPlaying.current = true;
+                setHasStarted(true);
+                // Avisa a Navbar para subir as barrinhas
+                window.dispatchEvent(new CustomEvent("zaeon-music-sync"));
+            }).catch((err: any) => {
+                console.warn("Bloqueio de áudio:", err);
+                setHasStarted(true);
+            });
+        } else {
+            // Fallback caso a Navbar demore a carregar
             setHasStarted(true);
-        }).catch(err => {
-            console.warn("Áudio não pôde tocar. Seguindo visualmente.", err);
-            isAudioPlaying.current = false;
-            setHasStarted(true); 
-        });
+        }
     };
 
     if (!visible) return null;
 
-    const zhPhrase =
-        phase >= 4 ? "世界之希望已诞生"
-            : phase >= 3 ? "日月星辰皆为吾家"
-            : phase >= 1 ? "万物归一"
-            : "";
+    const zhPhrase = phase >= 4 ? "世界之希望已诞生" : phase >= 3 ? "日月星辰皆为吾家" : phase >= 1 ? "万物归一" : "";
 
     return (
         <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black transition-opacity duration-300" style={{ opacity }}>
             <div className="flex flex-col items-center justify-center px-6">
-                
-                <button 
-                    onClick={handleInitiate}
-                    className={`flex flex-col items-center justify-center transition-all duration-300 ${!hasStarted ? "cursor-pointer hover:scale-105 hover:opacity-100 opacity-80" : "cursor-default opacity-95"}`}
-                    disabled={hasStarted}
-                >
+                <button onClick={handleInitiate} className={`flex flex-col items-center justify-center transition-all duration-300 ${!hasStarted ? "cursor-pointer hover:scale-105 opacity-80" : "cursor-default"}`} disabled={hasStarted}>
                     <Image src={logoSrc} alt="Zaeon" width={100} height={100} priority className="mb-4" />
-                    {!hasStarted && <span className="text-white/80 tracking-[0.2em] text-xs font-medium animate-pulse">INITIATE ZAEON</span>}
+                    {!hasStarted && <span className="text-white/80 tracking-[0.2em] text-xs font-medium animate-pulse">CLICK TO START ZAEON</span>}
                 </button>
 
                 <div className="h-[80px] flex flex-col items-center justify-start mt-6 w-full">
                     {!hasStarted ? (
-                        <div className="text-center text-[10px] tracking-widest leading-tight text-sky-400/70 font-light mt-4">
-                            FOR A BETTER EXPERIENCE, USE HEADPHONES
-                        </div>
+                        <div className="text-center text-[10px] tracking-widest text-sky-400/70 font-light mt-4 uppercase">For a better experience, use headphones</div>
                     ) : (
                         <>
                             <div className={`w-[200px] h-[3px] rounded-full bg-white/15 overflow-hidden transition-opacity duration-500 ${phase >= 1 ? 'opacity-100' : 'opacity-0'}`}>
-                                <div
-                                    ref={progressBarRef}
-                                    className="h-full rounded-full"
-                                    style={{
-                                        width: "0%",
-                                        background: "linear-gradient(90deg,rgba(255,255,255,.9),rgba(230,236,255,.95),rgba(255,255,255,.9))",
-                                        boxShadow: "0 0 8px rgba(255,255,255,0.35)",
-                                        transition: "none", 
-                                    }}
-                                />
+                                <div ref={progressBarRef} className="h-full rounded-full" style={{ width: "0%", background: "linear-gradient(90deg,rgba(255,255,255,.9),rgba(230,236,255,.95),rgba(255,255,255,.9))", boxShadow: "0 0 8px rgba(255,255,255,0.35)", transition: "none" }} />
                             </div>
-
-                            {zhPhrase && (
-                                <div className="mt-6 text-center text-[10px] tracking-widest leading-tight text-sky-400/90 font-light">
-                                    {zhPhrase}
-                                </div>
-                            )}
-
-                            <div className="mt-4 text-center text-[9px] leading-tight text-white/60 space-y-1" style={{ fontFamily: `"Ubuntu Mono","SF Mono","Menlo","Consolas","Liberation Mono",monospace` }}>
+                            {zhPhrase && <div className="mt-6 text-center text-[10px] tracking-widest text-sky-400/90 font-light">{zhPhrase}</div>}
+                            <div className="mt-4 text-center text-[9px] leading-tight text-white/60 space-y-1 font-mono uppercase">
                                 {phase >= 2 && <p>[ OK ] mounting zaeon kernel modules — <span ref={percentText1Ref}>0</span>%</p>}
                                 {phase >= 3 && <p>[ OK ] linking research graph services — <span ref={percentText2Ref}>40</span>%</p>}
                                 {phase >= 4 && (

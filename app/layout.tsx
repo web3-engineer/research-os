@@ -11,8 +11,9 @@ import { ThemeProvider } from "./providers";
 // 1. IMPORT THE WEB3 PROVIDER
 import { Web3Provider } from "@/src/context/Web3Context";
 
-// --- NOVO: COMPONENTE DE SOM GLOBAL ---
+// --- COMPONENTES GLOBAIS ---
 import GlobalClickSound from "@/components/main/GlobalClickSound";
+import { Navbar } from "@/components/main/navbar"; // <-- IMPORTAÇÃO DA NAVBAR AQUI (ajuste o caminho se necessário)
 
 import "../src/i18n";
 import "./globals.css";
@@ -67,6 +68,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                     <AuthProvider>
                         {/* 2. WRAP CHILDREN IN WEB3 PROVIDER */}
                         <Web3Provider>
+                            {/* AQUI ESTÁ O SEGREDO: 
+                                A Navbar nasce junto com a aplicação e nunca morre. 
+                                O áudio dela persiste em todas as rotas. 
+                            */}
+                            <Navbar />
                             {children}
                         </Web3Provider>
                     </AuthProvider>
